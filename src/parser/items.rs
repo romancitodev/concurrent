@@ -2,7 +2,7 @@
 ///
 /// It contains a vector of [`Node`]
 #[derive(Debug)]
-pub struct Graph(Vec<Node>);
+pub struct Graph(pub Vec<Node>);
 
 impl Graph {
     pub fn new(nodes: Vec<Node>) -> Self {

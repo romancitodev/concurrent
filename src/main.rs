@@ -1,12 +1,11 @@
 mod parser;
+mod rendering;
 use parser::grammar::parse;
 
-use std::fs::read_to_string;
-use std::io::Result;
+use std::env::args;
 
-fn main() -> Result<()> {
-    let file_content = read_to_string("src/test.graph")?;
-    let graph = parse(file_content);
-    println!("{graph:#?}");
-    Ok(())
+fn main() {
+    let input = args().nth(1).expect("Needed input");
+    let graph = parse(input);
+    rendering::render_graph(&graph.to_petgraph());
 }
