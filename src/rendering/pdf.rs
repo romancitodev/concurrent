@@ -59,55 +59,19 @@ fn build_connections(
 ) -> Vec<NodeIndex> {
     match node {
         Node::Par(nodes) => {
-            // Check if we have BOTH sequences AND atomics mixed together
-            let (has_seq, has_atomic) = nodes.iter().fold((false, false), |(seq, atom), n| {
-                (
-                    seq || matches!(n, Node::Seq(_)),
-                    atom || matches!(n, Node::Atomic(_, _)),
-                )
-            });
+            // Parallel: all nodes start from the same parent(s)
+            // Collect all their ending nodes
+            let mut all_endings = Vec::with_capacity(nodes.len());
 
-            if has_seq && has_atomic {
-                // Special case: mixed atomic and sequences
-                // Execute atomic nodes first, then flatten sequences into parallel
-                let mut current_parents = parents;
-
-                // First, process all atomic nodes
-                for n in nodes {
-                    if matches!(n, Node::Atomic(_, _)) {
-                        current_parents = build_connections(n, g, node_map, current_parents);
-                    }
-                }
-
-                // Then, flatten and parallelize all sequences
-                let mut all_endings = Vec::with_capacity(nodes.len() * 2);
-                for n in nodes {
-                    if let Node::Seq(seq_nodes) = n {
-                        // Flatten: each node in the sequence starts from current_parents
-                        for seq_node in seq_nodes {
-                            let endings =
-                                build_connections(seq_node, g, node_map, current_parents.clone());
-                            all_endings.extend(endings);
-                        }
-                    }
-                }
-
-                all_endings
-            } else {
-                // Normal parallel: all nodes start from the same parent(s)
-                // This includes the case where all nodes are sequences
-                let mut all_endings = Vec::with_capacity(nodes.len());
-
-                for n in nodes {
-                    let endings = build_connections(n, g, node_map, parents.clone());
-                    all_endings.extend(endings);
-                }
-
-                all_endings
+            for n in nodes {
+                let endings = build_connections(n, g, node_map, parents.clone());
+                all_endings.extend(endings);
             }
+
+            all_endings
         }
         Node::Seq(nodes) => {
-            // In sequence: each node starts after the previous one finishes
+            // Sequence: each node starts after the previous one finishes
             let mut current_parents = parents;
 
             for n in nodes {
