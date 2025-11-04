@@ -1,0 +1,40 @@
+/// It contains the whole program
+Program = { "$" ~ NodeList ~ "$" }
+
+/// It defines an identifier
+Id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+/// It defines the node Itself, can be a Task, a Parallel Node or a Sequencial one
+Node = { Task | Parallel | Sequencial }
+
+/// the Node itself, can contain dependencies
+Task = { Id ~ Deps? }
+
+/// The sequencial nodes, contains a [`NodeList`]
+///
+/// the syntax it's: [a, b, c]
+Sequencial = { "[" ~ NodeList ~ "]" }
+
+/// The Parallel nodes, contains a [`NodeList`]
+///
+/// the syntax it's: {a, b, c}
+Parallel = { "{" ~ NodeList ~ "}" }
+
+/// The list of nodes separated by a comma (,)
+NodeList = { Node ~ ("," ~ WHITESPACE? ~ Node)* }
+
+/// The id list separated by a comma (,)
+/// it's the same as [`NodeList`] but for Ids
+IdList = _{ Id ~ ("," ~ WHITESPACE? ~ Id)* }
+
+/// The dependencies list, contains an IdGroups
+///
+/// the syntax it's: <node>#{a, b, c} (the node needs to be preceding the dependencies)
+IdGroups = _{ "{" ~ IdList ~ "}" }
+
+/// The dependencies definition, contains an IdGroups
+///
+/// the syntax it's: #<IdGroups>
+Deps = { "#" ~ IdGroups }
+
+WHITESPACE = _{ " " }
