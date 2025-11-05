@@ -69,19 +69,3 @@ fn parse_atomic_node(inner_rule: Pair<'_, Rule>) -> (String, Vec<Node>) {
     }
     (id, deps)
 }
-
-// - Program > NodeList
-//   - Node > Task > Id: "a"
-//   - Node > Parallel > NodeList
-//     - Node > Task
-//       - Id: "b"
-//       - Deps
-//         - Id: "v"
-//         - Id: "f"
-//     - Node > Sequencial > NodeList
-//       - Node > Task > Id: "d"
-//       - Node > Task > Id: "h"
-//   - Node > Parallel > NodeList
-//     - Node > Task > Id: "c"
-//     - Node > Task > Id: "e"
-//   - Node > Task > Id: "f"

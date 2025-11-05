@@ -8,3 +8,4 @@ graphviz-rust = "0.9.6"
 pest = { version = "2.8.3", features = ["miette-error"] }
 pest_derive = "2.8.3"
 petgraph = "0.8.3"
+svg2pdf = "0.13.0"
