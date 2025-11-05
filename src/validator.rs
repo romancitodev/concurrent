@@ -173,25 +173,6 @@ fn detect_cycle(
     None
 }
 
-/// Counts the number of direct connections for a node
-/// Terminal nodes (marked with !) are not counted as connections to their dependents
-pub fn count_connections(node_id: &str, nodes: &HashMap<String, (Vec<String>, bool)>) -> usize {
-    if let Some((deps, _)) = nodes.get(node_id) {
-        // Count only non-terminal dependencies
-        deps.iter()
-            .filter(|dep_id| {
-                if let Some((_, is_terminal)) = nodes.get(*dep_id) {
-                    !is_terminal
-                } else {
-                    true // If dependency doesn't exist, count it (will be caught by validation)
-                }
-            })
-            .count()
-    } else {
-        0
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -233,11 +214,6 @@ mod tests {
             "sa".to_string(),
             (vec!["s8".to_string(), "s9".to_string()], false),
         );
-
-        // sa should have 2 connections (s8 and s9), not 3
-        // because s6 is terminal and shouldn't be counted transitively
-        let connections = count_connections("sa", &nodes);
-        assert_eq!(connections, 2);
     }
 
     #[test]

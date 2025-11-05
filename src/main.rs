@@ -30,11 +30,8 @@ fn main() {
             rendering::render_svg_to_pdf(svg, path).unwrap();
         }
         "f/k" => {
-            use parser::fk::cfg::ControlFlowGraph;
             use parser::fk::grammar::parse;
             let fk_graph = parse(&input).unwrap();
-
-            let cfg = ControlFlowGraph::from_graph(&fk_graph);
 
             let ir_graph = parser::fk::to_ir(&fk_graph);
             let svg = rendering::render_to_svg(&ir_graph.to_petgraph());
@@ -46,14 +43,3 @@ fn main() {
         }
     }
 }
-
-// begin
-// s1
-// fork L2
-// s3
-// L4: join C1
-// s4
-// goto final
-// L2: s2
-// goto L4
-// final: end

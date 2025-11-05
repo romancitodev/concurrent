@@ -33,7 +33,7 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Stmt>) {
         let Some(inner) = node.into_inner().next() else {
             break;
         };
-        println!("parse_node_list: {inner:#?}");
+        // println!("parse_node_list: {inner:#?}");
         if inner.as_rule() == Rule::LabeledStatement {
             parse_labeled_statement(inner, nodes);
         } else if inner.as_rule() == Rule::UnlabeledStatement {
@@ -45,7 +45,7 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Stmt>) {
 }
 
 fn parse_labeled_statement(node: Pair<Rule>, nodes: &mut Vec<Stmt>) {
-    println!("parse_labeled_statement (outer): {node:#?}");
+    // println!("parse_labeled_statement (outer): {node:#?}");
 
     let mut node = node.into_inner();
     let inner = node.next().unwrap();
@@ -62,18 +62,18 @@ fn parse_labeled_statement(node: Pair<Rule>, nodes: &mut Vec<Stmt>) {
 
 fn parse_unlabeled_statement(node: Pair<Rule>, nodes: &mut Vec<Stmt>) {
     let inner = node.into_inner().next().unwrap();
-    println!("parse_unlabeled_statement: {inner:#?}");
+    // println!("parse_unlabeled_statement: {inner:#?}");
     let statement = parse_atomic_unlabebled_statement(inner);
     nodes.push(Stmt::new(None, statement));
 }
 
 fn parse_atomic_unlabebled_statement(node: Pair<Rule>) -> Node {
-    println!("parse_atomic_unlabebled_statement: (node) {node:#?}");
+    // println!("parse_atomic_unlabebled_statement: (node) {node:#?}");
     match node.as_rule() {
         Rule::Task => {
             // node.into_inner() -> Id
             let id = node.into_inner().next().unwrap().as_str().to_string();
-            println!("id => {id}");
+            // println!("id => {id}");
             Node::Atomic(id)
         }
         Rule::Fork => {
