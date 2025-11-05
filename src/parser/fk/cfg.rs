@@ -68,7 +68,6 @@ impl ControlFlowGraph {
                         cfg.edges.push((idx, idx + 1));
                     }
                 }
-                _ => {}
             }
             cfg.nodes.insert(idx, stmt.node.clone());
         }
@@ -159,7 +158,7 @@ impl ControlFlowGraph {
     pub fn to_ir(&self) -> grammar::Graph {
         // Use region-based analysis for better handling of complex CFGs
         let region = self.build_region_tree(0, &mut HashSet::new());
-        let ir_nodes = self.region_to_ir(&region);
+        let ir_nodes = Self::region_to_ir(&region);
         grammar::Graph::new(vec![ir_nodes])
     }
 
@@ -505,12 +504,11 @@ impl ControlFlowGraph {
     }
 
     /// Converts a region tree to IR nodes
-    fn region_to_ir(&self, region: &Region) -> grammar::Node {
+    fn region_to_ir(region: &Region) -> grammar::Node {
         match region {
             Region::Atomic { name, .. } => grammar::Node::Atomic(name.clone(), vec![], false),
             Region::Sequence { regions } => {
-                let ir_nodes: Vec<grammar::Node> =
-                    regions.iter().map(|r| self.region_to_ir(r)).collect();
+                let ir_nodes: Vec<grammar::Node> = regions.iter().map(Self::region_to_ir).collect();
 
                 if ir_nodes.is_empty() {
                     // This shouldn't happen, but handle it
@@ -523,7 +521,7 @@ impl ControlFlowGraph {
             }
             Region::Parallel { branches, .. } => {
                 let ir_branches: Vec<grammar::Node> =
-                    branches.iter().map(|b| self.region_to_ir(b)).collect();
+                    branches.iter().map(Self::region_to_ir).collect();
 
                 grammar::Node::Par(ir_branches)
             }
