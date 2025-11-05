@@ -34,7 +34,7 @@ fn collect_nodes(node: &Node, g: &mut Flow, node_map: &mut HashMap<String, NodeI
                 collect_nodes(n, g, node_map);
             }
         }
-        Node::Atomic(id, deps) => {
+        Node::Atomic(id, deps, _is_terminal) => {
             node_map
                 .entry(id.clone())
                 .or_insert_with(|| g.add_node(id.clone()));
@@ -80,7 +80,7 @@ fn build_connections(
 
             current_parents
         }
-        Node::Atomic(id, deps) => {
+        Node::Atomic(id, deps, is_terminal) => {
             let current_index = node_map[id];
 
             // Connect parent nodes to this node
@@ -96,8 +96,13 @@ fn build_connections(
                 }
             }
 
-            // Return this node as the ending node
-            vec![current_index]
+            // Terminal nodes (marked with !) don't propagate connections
+            // They end the chain here
+            if *is_terminal {
+                vec![]
+            } else {
+                vec![current_index]
+            }
         }
         Node::Dep(name) => {
             // Dependencies are handled in Atomic nodes

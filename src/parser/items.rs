@@ -41,7 +41,9 @@ impl Graph {
 pub enum Node {
     Par(Vec<Node>),
     Seq(Vec<Node>),
-    /// It contains the name of the node and a list of depedencies, every [`Node`] in the vec it's another [`Node::Dep`].
-    Atomic(String, Vec<Node>),
+    /// It contains the name of the node, a list of depedencies, and a terminal flag.
+    /// Every [`Node`] in the vec it's another [`Node::Dep`].
+    /// The terminal flag indicates if this node has no parent (marked with !).
+    Atomic(String, Vec<Node>, bool),
     Dep(String),
 }

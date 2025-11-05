@@ -8,7 +8,8 @@ Id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 Node = { Task | Parallel | Sequencial }
 
 /// the Node itself, can contain dependencies
-Task = { Id ~ Deps? }
+/// Can also be marked as terminal with ! (no parent)
+Task = { Id ~ Deps? ~ Terminal? }
 
 /// The sequencial nodes, contains a [`NodeList`]
 ///
@@ -36,5 +37,9 @@ IdGroups = _{ "{" ~ IdList ~ "}" }
 ///
 /// the syntax it's: #<IdGroups>
 Deps = { "#" ~ IdGroups }
+
+/// Terminal marker, indicates this node has no parent
+/// the syntax it's: <node>!
+Terminal = { "!" }
 
 WHITESPACE = _{ " " }

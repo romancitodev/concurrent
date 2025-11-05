@@ -32,8 +32,8 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Node>) {
         let inner_rule = node.into_inner().next().unwrap();
         match inner_rule.as_rule() {
             Rule::Task => {
-                let (id, deps) = parse_atomic_node(inner_rule);
-                nodes.push(Node::Atomic(id, deps));
+                let (id, deps, is_terminal) = parse_atomic_node(inner_rule);
+                nodes.push(Node::Atomic(id, deps, is_terminal));
             }
             Rule::Sequencial => {
                 // parse sequencial
@@ -54,18 +54,30 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Node>) {
     }
 }
 
-fn parse_atomic_node(inner_rule: Pair<'_, Rule>) -> (String, Vec<Node>) {
+fn parse_atomic_node(inner_rule: Pair<'_, Rule>) -> (String, Vec<Node>, bool) {
     let mut inner_rules = inner_rule.into_inner();
     let id_rule = inner_rules.next().unwrap();
     let id = id_rule.as_str().to_string();
 
     let mut deps = vec![];
-    if let Some(deps_rule) = inner_rules.next() {
-        // There are dependencies
-        for dep in deps_rule.into_inner() {
-            let dep_id = dep.as_str().to_string();
-            deps.push(Node::Dep(dep_id));
+    let mut is_terminal = false;
+
+    for rule in inner_rules {
+        match rule.as_rule() {
+            Rule::Deps => {
+                // There are dependencies
+                for dep in rule.into_inner() {
+                    let dep_id = dep.as_str().to_string();
+                    deps.push(Node::Dep(dep_id));
+                }
+            }
+            Rule::Terminal => {
+                // This node is marked as terminal (no parent)
+                is_terminal = true;
+            }
+            _ => {}
         }
     }
-    (id, deps)
+
+    (id, deps, is_terminal)
 }
