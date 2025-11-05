@@ -1,0 +1,11 @@
+begin
+s0
+s1
+fork L2
+s3
+s4
+goto end
+L2: s2
+s5
+goto end
+end

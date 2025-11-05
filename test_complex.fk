@@ -1,0 +1,25 @@
+begin
+s0
+s1
+fork L2
+fork L3
+s4
+fork L6
+s7
+L9: join
+s9
+LA: join
+sa
+L2: s2
+L5: join
+s5
+L8: join
+s8
+goto LA
+L3: s3
+fork L5
+L6: join
+s6
+fork L8
+goto L9
+end
