@@ -91,10 +91,7 @@ fn check_missing_dependencies(
             if !all_node_ids.contains(dep_id) {
                 errors.push(ValidationError::new(
                     ValidationErrorKind::MissingDependency,
-                    format!(
-                        "Node '{}' depends on '{}' which doesn't exist",
-                        node_id, dep_id
-                    ),
+                    format!("Node '{node_id}' depends on '{dep_id}' which doesn't exist"),
                 ));
             }
         }
@@ -116,15 +113,15 @@ fn check_circular_dependencies(
     let mut rec_stack = HashSet::new();
 
     for node_id in nodes.keys() {
-        if !visited.contains(node_id) {
-            if let Some(cycle) =
-                detect_cycle(node_id, nodes, &mut visited, &mut rec_stack, &mut vec![])
-            {
-                errors.push(ValidationError::new(
-                    ValidationErrorKind::CircularDependency,
-                    format!("Circular dependency detected: {}", cycle.join(" -> ")),
-                ));
-            }
+        if visited.contains(node_id) {
+            continue;
+        }
+        if let Some(cycle) = detect_cycle(node_id, nodes, &mut visited, &mut rec_stack, &mut vec![])
+        {
+            errors.push(ValidationError::new(
+                ValidationErrorKind::CircularDependency,
+                format!("Circular dependency detected: {}", cycle.join(" -> ")),
+            ));
         }
     }
 
@@ -165,7 +162,7 @@ fn detect_cycle(
                         cycle.push(p.clone());
                     }
                 }
-                cycle.push(dep_id.to_string());
+                cycle.push(dep_id.clone());
                 return Some(cycle);
             }
         }
