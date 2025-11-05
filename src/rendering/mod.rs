@@ -1,8 +1,8 @@
 pub mod pdf;
+use petgraph::dot::{Config, Dot};
 use std::{fmt::Write, io, path::Path};
 
-use graphviz_rust::{cmd::Format, parse, printer::PrinterContext};
-use petgraph::dot::{Config, Dot};
+use layout::{backends::svg::SVGWriter, gv, topo::layout::VisualGraph};
 
 pub fn render_graph(graph: &pdf::Flow) -> String {
     let mut buffer = String::new();
@@ -15,14 +15,21 @@ pub fn render_graph(graph: &pdf::Flow) -> String {
     buffer
 }
 
-pub fn render_to_svg(graph: &pdf::Flow) -> Vec<u8> {
+pub fn render_to_svg(graph: &pdf::Flow) -> String {
     let dot_string = render_graph(graph);
-    graphviz_rust::exec(
-        parse(&dot_string).expect("can't parse dot string"),
-        &mut PrinterContext::default(),
-        vec![Format::Svg.into()],
-    )
-    .expect("Failed to render SVG")
+    let mut parser = gv::DotParser::new(&dot_string);
+
+    let tree = parser.process().expect("Unable to parse the file");
+    let mut gb = gv::GraphBuilder::new();
+    gb.visit_graph(&tree);
+    let mut visual_graph = gb.get();
+    generate_svg(&mut visual_graph)
+}
+
+fn generate_svg(graph: &mut VisualGraph) -> String {
+    let mut svg = SVGWriter::new();
+    graph.do_it(false, false, false, &mut svg);
+    svg.finalize()
 }
 
 pub fn render_svg_to_pdf(svg: impl AsRef<str>, output: &Path) -> io::Result<()> {
