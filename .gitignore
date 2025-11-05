@@ -1,2 +1,11 @@
 /target
 /render
+
+# Test files
+test_*.graph
+*.pdf
+!examples/output/*.pdf
+
+# OS specific
+.DS_Store
+Thumbs.db
