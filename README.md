@@ -25,7 +25,7 @@ bash generate_examples.sh
 * ✅ **Automatic validation** of circular and missing dependencies
 * ✅ **PDF generation** with flow graphs
 * ✅ **Unlimited nested structures**
-* 🚧 **Conversion to/from Fork/Join** (planned)
+* 🚧 **Conversion to/from Fork/Join** (⚠️ partial implemented)
 * 🚧 **Conversion to/from Parbegin/Parend** (planned)
 * 🚧 **WebAssembly compilation** (planned)
 * 🚧 **Visual block editor** (planned)

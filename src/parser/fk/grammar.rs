@@ -56,18 +56,18 @@ fn parse_labeled_statement(node: Pair<Rule>, nodes: &mut Vec<Stmt>) {
     let label = inner_label.as_str().to_string();
 
     let unlabeled_node = node.next().unwrap().into_inner().next().unwrap();
-    let statement = parse_atomic_unlabebled_statement(unlabeled_node);
+    let statement = parse_atomic_unlabeled_statement(unlabeled_node);
     nodes.push(Stmt::new(Some(label), statement));
 }
 
 fn parse_unlabeled_statement(node: Pair<Rule>, nodes: &mut Vec<Stmt>) {
     let inner = node.into_inner().next().unwrap();
     // println!("parse_unlabeled_statement: {inner:#?}");
-    let statement = parse_atomic_unlabebled_statement(inner);
+    let statement = parse_atomic_unlabeled_statement(inner);
     nodes.push(Stmt::new(None, statement));
 }
 
-fn parse_atomic_unlabebled_statement(node: Pair<Rule>) -> Node {
+fn parse_atomic_unlabeled_statement(node: Pair<Rule>) -> Node {
     // println!("parse_atomic_unlabebled_statement: (node) {node:#?}");
     match node.as_rule() {
         Rule::Task => {
