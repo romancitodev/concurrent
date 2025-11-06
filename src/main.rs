@@ -30,6 +30,17 @@ fn main() {
             let svg = rendering::render_to_svg(&graph.to_petgraph());
             rendering::render_svg_to_pdf(svg, path).unwrap();
         }
+        "par" => {
+            use parser::par::grammar::parse;
+            let par_graph = parse(&input).unwrap();
+
+            println!("{par_graph:#?}");
+
+            let ir = parser::par::to_ir(&par_graph);
+            let svg = rendering::render_to_svg(&ir.to_petgraph());
+
+            rendering::render_svg_to_pdf(svg, path).unwrap();
+        }
         "f/j" => {
             use parser::fk::grammar::parse;
             let fk_graph = parse(&input).unwrap();

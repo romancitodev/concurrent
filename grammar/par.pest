@@ -1,0 +1,26 @@
+Program = { SOI ~ "begin" ~ NEWLINE* ~ Statement+ ~ "end" ~ EOI }
+
+Statement = _{
+    NEWLINE* ~ Block ~ NEWLINE*
+}
+
+Inline = _{ !KW ~ Id }
+
+Block = _{
+    (ParBlock | SeqBlock | Inline)
+}
+
+SeqBlock = {
+    "begin" ~ Statement+ ~ "end"
+}
+
+ParBlock = {
+    "parbegin" ~ Statement+ ~ "parend"
+}
+
+Id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+
+WHITESPACE = _{ " " | "\t" }
+NEWLINE    = _{ "\n" | "\r\n" }
+
+KW = { "begin" | "end" | "parbegin" | "parend" }
