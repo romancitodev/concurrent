@@ -26,7 +26,7 @@ bash generate_examples.sh
 * ✅ **PDF generation** with flow graphs
 * ✅ **Unlimited nested structures**
 * 🚧 **Conversion to/from Fork/Join** (⚠️ partial implemented)
-* 🚧 **Conversion to/from Parbegin/Parend** (planned)
+* 🚧 **Conversion to/from Parbegin/Parend** (⚠️ partial implemented)
 * 🚧 **WebAssembly compilation** (planned)
 * 🚧 **Visual block editor** (planned)
 
