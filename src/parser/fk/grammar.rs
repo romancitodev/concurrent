@@ -84,7 +84,13 @@ fn parse_atomic_unlabebled_statement(node: Pair<Rule>) -> Node {
             let id = node.into_inner().next().unwrap().as_str().to_string();
             Node::Goto(id)
         }
-        Rule::Join => Node::Join,
+        Rule::Join => {
+            let id = node
+                .into_inner()
+                .next()
+                .map(|node| node.as_str().to_string());
+            Node::Join(id)
+        }
         _ => unreachable!(),
     }
 }

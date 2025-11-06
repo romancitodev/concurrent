@@ -20,19 +20,17 @@ Label = { Id ~ ":" ~ NEWLINE* }
 Fork = { "fork" ~ IdList ~ NEWLINE+ }
 
 // Join puede esperar múltiples threads (opcional)
-Join = { "join" ~ IdList? ~ NEWLINE+ }  // join o join L1, L2
+Join = { "join" ~ IdList? ~ NEWLINE+ }
+// join o join L1, L2
 
 Goto = { "goto" ~ Id ~ NEWLINE+ }
 
 Task = { Id ~ NEWLINE+ }
 
 // Helper rules
-IdList = { Id ~ ("," ~ NEWLINE* ~ Id)* }
-Id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
-
-// Keywords (para evitar que sean parseados como Task)
-KEYWORD = @{ "fork" | "join" | "goto" | "begin" | "end" }
+IdList =  { Id ~ ("," ~ NEWLINE* ~ Id)* }
+Id     = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
 WHITESPACE = _{ " " | "\t" }
-NEWLINE = _{ "\n" | "\r\n" }
-COMMENT = _{ "//" ~ (!NEWLINE ~ ANY)* }  // Bonus: comentarios opcionales
+NEWLINE    = _{ "\n" | "\r\n" }
+// Bonus: comentarios opcionales

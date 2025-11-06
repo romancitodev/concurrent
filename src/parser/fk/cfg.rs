@@ -85,7 +85,7 @@ impl ControlFlowGraph {
                         cfg.edges.push((idx, idx + 1));
                     }
                 }
-                Node::Atomic(_) | Node::Join => {
+                Node::Atomic(_) | Node::Join(_) => {
                     // Sequential flow to next statement
                     if idx + 1 < graph.0.len() {
                         cfg.edges.push((idx, idx + 1));
@@ -132,7 +132,7 @@ impl ControlFlowGraph {
                 }
                 atomic_region
             }
-            Node::Join | Node::Goto(_) => {
+            Node::Join(_) | Node::Goto(_) => {
                 // Continue through structural nodes
                 if let Some(next_idx) = self.find_successor(start_idx)
                     && !visited.contains(&next_idx)
@@ -218,7 +218,7 @@ impl ControlFlowGraph {
                         name: name.clone(),
                     });
                 }
-                Node::Join | Node::Goto(_) => {
+                Node::Join(_) | Node::Goto(_) => {
                     // Continue through structural nodes
                     // "goto end" is handled by find_successor returning None
                 }

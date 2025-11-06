@@ -7,10 +7,11 @@ use validator::validate;
 use std::{env::args, path::Path};
 
 fn main() {
-    let input = args().nth(1).expect("Needed input");
+    let input = args().nth(1).expect("Needed input file");
     let path = args().nth(2).unwrap_or_else(|| "render/output".to_string());
     let type_ = args().nth(3).unwrap_or_else(|| "grammar".to_string());
 
+    let input = std::fs::read_to_string(&input).expect("Failed to read input file");
     let path = Path::new(&path);
 
     match type_.as_str() {
@@ -29,7 +30,7 @@ fn main() {
             let svg = rendering::render_to_svg(&graph.to_petgraph());
             rendering::render_svg_to_pdf(svg, path).unwrap();
         }
-        "f/k" => {
+        "f/j" => {
             use parser::fk::grammar::parse;
             let fk_graph = parse(&input).unwrap();
 

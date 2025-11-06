@@ -16,7 +16,7 @@ impl Graph {
 /// or a Atomic Node (the atomic operation itself)
 #[derive(Debug, Clone)]
 pub enum Node {
-    Join,
+    Join(Option<String>),
     Goto(String),
     Fork(String),
     /// It contains the name of the node
