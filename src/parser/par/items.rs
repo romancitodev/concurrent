@@ -1,4 +1,4 @@
-use crate::parser::items;
+use crate::parser::ir::items;
 
 /// Represents the program
 ///
@@ -12,24 +12,18 @@ impl Graph {
     }
 
     pub fn to_ir(&self) -> items::Graph {
-        let ir_nodes = self.0.iter().map(|node| self.node_to_ir(node)).collect();
+        let ir_nodes = self.0.iter().map(Self::node_to_ir).collect();
         items::Graph::new(ir_nodes)
     }
 
-    fn node_to_ir(&self, node: &Node) -> items::Node {
+    fn node_to_ir(node: &Node) -> items::Node {
         match node {
             Node::Par(children) => {
-                let ir_children = children
-                    .iter()
-                    .map(|child| self.node_to_ir(child))
-                    .collect();
+                let ir_children = children.iter().map(Self::node_to_ir).collect();
                 items::Node::Par(ir_children)
             }
             Node::Seq(children) => {
-                let ir_children = children
-                    .iter()
-                    .map(|child| self.node_to_ir(child))
-                    .collect();
+                let ir_children = children.iter().map(Self::node_to_ir).collect();
                 items::Node::Seq(ir_children)
             }
             Node::Atomic(name) => items::Node::Atomic(name.clone(), vec![], false),

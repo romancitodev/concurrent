@@ -1,4 +1,4 @@
-use crate::parser::items::{Graph, Node};
+use crate::parser::ir::items::{Graph, Node};
 use petgraph::Directed;
 use petgraph::graph::{Graph as PetGraph, NodeIndex};
 use std::collections::HashMap;

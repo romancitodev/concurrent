@@ -1,19 +1,19 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::parser::fk::items::{Graph, Node};
-use crate::parser::items as grammar;
+use crate::parser::ir::items as grammar;
 
 /// Represents a region in the control flow graph
 #[derive(Debug, Clone)]
 enum Region {
     /// Sequential region containing a single atomic operation
-    Atomic { idx: usize, name: String },
+    Atomic { /*idx: usize,*/ name: String },
     /// Sequential region containing multiple sub-regions
     Sequence { regions: Vec<Region> },
     /// Parallel region with multiple branches that converge at a join
     Parallel {
         branches: Vec<Region>,
-        join_idx: Option<usize>,
+        /* join_idx: Option<usize>, */
     },
 }
 
@@ -119,10 +119,7 @@ impl ControlFlowGraph {
         match node {
             Node::Fork(target_label) => self.build_fork_region(start_idx, target_label, visited),
             Node::Atomic(name) => {
-                let atomic_region = Region::Atomic {
-                    idx: start_idx,
-                    name: name.clone(),
-                };
+                let atomic_region = Region::Atomic { name: name.clone() };
 
                 if let Some(next_idx) = self.find_successor(start_idx)
                     && !visited.contains(&next_idx)
@@ -171,10 +168,7 @@ impl ControlFlowGraph {
             }
         }
 
-        Region::Parallel {
-            branches,
-            join_idx: None,
-        }
+        Region::Parallel { branches }
     }
 
     /// Builds a branch region to its natural end
@@ -213,10 +207,7 @@ impl ControlFlowGraph {
                     break; // Fork handles its own continuation
                 }
                 Node::Atomic(name) => {
-                    regions.push(Region::Atomic {
-                        idx: current,
-                        name: name.clone(),
-                    });
+                    regions.push(Region::Atomic { name: name.clone() });
                 }
                 Node::Join(_) | Node::Goto(_) => {
                     // Continue through structural nodes

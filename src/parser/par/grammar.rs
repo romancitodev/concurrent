@@ -7,6 +7,7 @@ use super::items::{Graph, Node};
 #[grammar = "../grammar/par.pest"]
 pub struct ParParser;
 
+#[allow(clippy::result_large_err)] // We can't do much about it
 pub fn parse(file: impl AsRef<str>) -> Result<Graph, Error<Rule>> {
     let rule = ParParser::parse(Rule::Program, file.as_ref())?
         .next()
@@ -28,7 +29,7 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Node>) {
         println!("parse_node_list: {node:#?}");
         match node.as_rule() {
             Rule::Id => {
-                let inline_node = parse_id(node);
+                let inline_node = parse_id(&node);
                 nodes.push(Node::Atomic(inline_node));
             }
             Rule::Inline => {
@@ -49,13 +50,13 @@ pub fn parse_node_list(node_list: Pairs<Rule>, nodes: &mut Vec<Node>) {
     }
 }
 
-fn parse_id(node: pest::iterators::Pair<Rule>) -> String {
+fn parse_id(node: &pest::iterators::Pair<Rule>) -> String {
     node.as_str().to_string()
 }
 
 fn parse_inline(node: pest::iterators::Pair<Rule>) -> Node {
     let node = node.into_inner().next().unwrap();
-    let id = parse_id(node);
+    let id = parse_id(&node);
     Node::Atomic(id)
 }
 
@@ -65,7 +66,7 @@ fn parse_par_block(node: pest::iterators::Pair<Rule>) -> Node {
         println!("parse_par_block inner: {inner:#?}");
         match inner.as_rule() {
             Rule::Id => {
-                let inline_node = parse_id(inner);
+                let inline_node = parse_id(&inner);
                 inner_nodes.push(Node::Atomic(inline_node));
             }
             Rule::Inline => {
@@ -87,7 +88,7 @@ fn parse_seq_block(node: pest::iterators::Pair<Rule>) -> Node {
     for inner in node.into_inner() {
         match inner.as_rule() {
             Rule::Id => {
-                let inline_node = parse_id(inner);
+                let inline_node = parse_id(&inner);
                 inner_nodes.push(Node::Atomic(inline_node));
             }
             Rule::Inline => {

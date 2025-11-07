@@ -16,6 +16,7 @@ impl Graph {
 /// or a Atomic Node (the atomic operation itself)
 #[derive(Debug, Clone)]
 pub enum Node {
+    #[allow(unused)]
     Join(Option<String>),
     Goto(String),
     Fork(String),

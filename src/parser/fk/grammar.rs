@@ -12,6 +12,7 @@ use crate::parser::fk::items::{Graph, Node, Stmt};
 #[grammar = "../grammar/fk.pest"]
 pub struct ForkJoinParser;
 
+#[allow(clippy::result_large_err)] // We can't do much about it
 pub fn parse(file: impl AsRef<str>) -> Result<Graph, Error<Rule>> {
     let rule = ForkJoinParser::parse(Rule::Program, file.as_ref())?
         .next()

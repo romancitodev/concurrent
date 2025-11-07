@@ -4,7 +4,7 @@ use pest::{
 };
 use pest_derive::Parser;
 
-use crate::parser::items::{Graph, Node};
+use crate::parser::ir::items::{Graph, Node};
 
 #[derive(Parser)]
 #[grammar = "../grammar/lang.pest"]

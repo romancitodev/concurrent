@@ -1,4 +1,4 @@
-use crate::parser::items::{Graph, Node};
+use crate::parser::ir::items::{Graph, Node};
 use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone)]

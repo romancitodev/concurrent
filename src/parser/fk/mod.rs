@@ -54,7 +54,7 @@ pub mod cfg;
 pub mod grammar;
 pub mod items;
 
-use crate::parser::items as grammar_items;
+use crate::parser::ir::items as ir;
 
 /// Converts a fork-join graph to the grammar IR (parallel/sequential representation)
 ///
@@ -127,7 +127,19 @@ use crate::parser::items as grammar_items;
 /// # Returns
 ///
 /// A grammar IR graph with parallel and sequential structure
-pub fn to_ir(graph: &items::Graph) -> grammar_items::Graph {
+pub fn to_ir(graph: &items::Graph) -> ir::Graph {
     let cfg = cfg::ControlFlowGraph::from_graph(graph);
     cfg.to_ir()
+}
+
+impl From<ir::Graph> for items::Graph {
+    fn from(graph: ir::Graph) -> Self {
+        let cfg = cfg::ControlFlowGraph::from_graph(&graph);
+        cfg.to_ir()
+    }
+}
+
+#[expect(unused)]
+pub fn from_ir(graph: &ir::Graph) -> items::Graph {
+    todo!()
 }

@@ -1,7 +1,7 @@
 mod parser;
 mod rendering;
 mod validator;
-use parser::grammar::parse;
+use parser::ir::grammar::parse;
 use validator::validate;
 
 use std::{env::args, path::Path};
