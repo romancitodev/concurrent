@@ -184,11 +184,10 @@ impl ControlFlowGraph {
                     }
                     // Follow the goto
                     if let Some(&target_idx) = self.labels.get(target) {
-                        if !global_visited.contains(&target_idx) {
-                            current = target_idx;
-                        } else {
+                        if global_visited.contains(&target_idx) {
                             break;
                         }
+                        current = target_idx;
                     } else {
                         break;
                     }
@@ -210,10 +209,10 @@ impl ControlFlowGraph {
 
         loop {
             // Stop at join point
-            if let Some(join) = join_idx {
-                if current == join {
-                    break;
-                }
+            if let Some(join) = join_idx
+                && current == join
+            {
+                break;
             }
 
             if global_visited.contains(&current) {
@@ -304,8 +303,12 @@ impl ControlFlowGraph {
         // Look for the next join statement after the fork
         // The join is typically where all branches converge
 
-        // First, follow the main path to find a join
+        // First, skip over any consecutive forks (they share the same join)
         let mut current = fork_idx + 1;
+        while let Some(fk::Node::Fork(_)) = self.nodes.get(&current) {
+            current += 1;
+        }
+
         let mut visited = HashSet::new();
 
         while let Some(node) = self.nodes.get(&current) {

@@ -1,8 +1,8 @@
 set shell := ["nu", "-c"]
 
+#[private]
 default:
     just --list
-
 
 render file output choice="pdf":
     cargo run --release -- render {{choice}} -f {{file}} -o {{output}}

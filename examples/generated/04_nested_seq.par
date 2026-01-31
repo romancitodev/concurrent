@@ -1,0 +1,14 @@
+begin
+  s1
+  parbegin
+    begin
+      s2
+      s3
+    end
+    begin
+      s4
+      s5
+    end
+  parend
+  s6
+end

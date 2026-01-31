@@ -10,6 +10,7 @@ begin
     s7
     L2: join c3
     s10
+    goto end
     Ls3: s3
         fork Ls5
         s4

@@ -1,7 +1,6 @@
 begin
-  s0
+  s1
   parbegin
-    s1
     s2
     s3
   parend

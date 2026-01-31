@@ -1,0 +1,11 @@
+begin
+    s1
+    fork Ls4
+    s2
+    s3
+    L0: join c1
+    s6
+    Ls4: s4
+        s5
+        goto L0
+end
