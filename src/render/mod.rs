@@ -1,10 +1,17 @@
-pub mod pdf;
+use std::fmt::Write;
+use std::io;
+use std::path::Path;
+
+use layout::backends::svg::SVGWriter;
+use layout::gv::{DotParser, GraphBuilder};
+use layout::topo::layout::VisualGraph;
+use petgraph::Directed;
 use petgraph::dot::{Config, Dot};
-use std::{fmt::Write, io, path::Path};
+use petgraph::graph::Graph as PetGraph;
 
-use layout::{backends::svg::SVGWriter, gv, topo::layout::VisualGraph};
+pub type Flow = PetGraph<String, &'static str, Directed>;
 
-pub fn render_graph(graph: &pdf::Flow) -> String {
+pub fn render_graph(graph: &Flow) -> String {
     let mut buffer = String::new();
     write!(
         &mut buffer,
@@ -15,12 +22,12 @@ pub fn render_graph(graph: &pdf::Flow) -> String {
     buffer
 }
 
-pub fn render_to_svg(graph: &pdf::Flow) -> String {
+pub fn render_to_svg(graph: &Flow) -> String {
     let dot_string = render_graph(graph);
-    let mut parser = gv::DotParser::new(&dot_string);
+    let mut parser = DotParser::new(&dot_string);
 
     let tree = parser.process().expect("Unable to parse the file");
-    let mut gb = gv::GraphBuilder::new();
+    let mut gb = GraphBuilder::new();
     gb.visit_graph(&tree);
     let mut visual_graph = gb.get();
     generate_svg(&mut visual_graph)

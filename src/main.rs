@@ -1,57 +1,105 @@
-mod parser;
-mod rendering;
-mod validator;
-use parser::ir::grammar::parse;
-use validator::validate;
+mod cli;
+use cli::cli;
 
-use std::{env::args, path::Path};
+use std::path::PathBuf;
 
-fn main() {
-    let input = args().nth(1).expect("Needed input file");
-    let path = args().nth(2).unwrap_or_else(|| "render/output".to_string());
-    let type_ = args().nth(3).unwrap_or_else(|| "grammar".to_string());
+use concurrent::{Error, convert_graph, process_graph_to_ir, process_graph_to_pdf};
 
-    let input = std::fs::read_to_string(&input).expect("Failed to read input file");
-    let path = Path::new(&path);
+type AppResult<T> = Result<T, Error>;
 
-    match type_.as_str() {
-        "grammar" => {
-            let graph = parse(&input);
+const DEFAULT_OUTPUT: &str = "render/output.pdf";
 
-            // Validate the graph
-            if let Err(errors) = validate(&graph) {
-                eprintln!("❌ Validation errors found:\n");
-                for error in errors {
-                    eprintln!("  • {}", error.message);
-                }
-                std::process::exit(1);
-            }
+fn main() -> AppResult<()> {
+    let cmd = cli();
 
-            let svg = rendering::render_to_svg(&graph.to_petgraph());
-            rendering::render_svg_to_pdf(svg, path).unwrap();
-        }
-        "par" => {
-            use parser::par::grammar::parse;
-            let par_graph = parse(&input).unwrap();
+    match cmd.subcommand() {
+        Some(("render", render_cmd)) => match render_cmd.subcommand() {
+            Some(("pdf", args)) => render_pdf(args),
+            Some(("ir", args)) => render_ir(args),
+            _ => Err(Error::InvalidParams),
+        },
+        Some(("convert", cmd)) => convert(cmd),
+        _ => Err(Error::InvalidParams),
+    }?;
 
-            println!("{par_graph:#?}");
+    Ok(())
+}
 
-            let ir = parser::par::to_ir(&par_graph);
-            let svg = rendering::render_to_svg(&ir.to_petgraph());
+fn render_pdf(args: &clap::ArgMatches) -> AppResult<()> {
+    let (input, ext) = if let Some(inline) = args.get_one::<String>("input") {
+        (inline.clone(), "graph")
+    } else if let Some(file_path) = args.get_one::<PathBuf>("file") {
+        let ext = file_path
+            .extension()
+            .expect("File must have an extension")
+            .to_str()
+            .unwrap();
+        (
+            std::fs::read_to_string(file_path)
+                .map_err(|e| Error::ParseError(format!("Failed to read file: {e}")))?,
+            ext,
+        )
+    } else {
+        return Err(Error::InvalidParams);
+    };
 
-            rendering::render_svg_to_pdf(svg, path).unwrap();
-        }
-        "f/j" => {
-            use parser::fk::grammar::parse;
-            let fk_graph = parse(&input).unwrap();
+    let output_path = args
+        .get_one::<PathBuf>("output")
+        .cloned()
+        .unwrap_or(PathBuf::from(DEFAULT_OUTPUT));
 
-            let ir_graph = parser::fk::to_ir(&fk_graph);
-            let svg = rendering::render_to_svg(&ir_graph.to_petgraph());
-            rendering::render_svg_to_pdf(svg, path).unwrap();
-        }
-        _ => {
-            eprintln!("Unknown type: {type_:?}");
-            std::process::exit(1);
-        }
-    }
+    process_graph_to_pdf(&input, &output_path, ext)
+}
+
+fn render_ir(args: &clap::ArgMatches) -> AppResult<()> {
+    let (input, ext) = if let Some(inline) = args.get_one::<String>("input") {
+        (inline.clone(), "graph")
+    } else if let Some(file_path) = args.get_one::<PathBuf>("file") {
+        let ext = file_path
+            .extension()
+            .expect("File must have an extension")
+            .to_str()
+            .unwrap();
+        (
+            std::fs::read_to_string(file_path)
+                .map_err(|e| Error::ParseError(format!("Failed to read file: {e}")))?,
+            ext,
+        )
+    } else {
+        return Err(Error::InvalidParams);
+    };
+
+    let output_path = args
+        .get_one::<PathBuf>("output")
+        .cloned()
+        .unwrap_or(PathBuf::from(DEFAULT_OUTPUT));
+
+    process_graph_to_ir(&input, &output_path, ext)
+}
+
+fn convert(args: &clap::ArgMatches) -> AppResult<()> {
+    let (input, ext) = if let Some(inline) = args.get_one::<String>("input") {
+        (inline.clone(), "graph")
+    } else if let Some(file_path) = args.get_one::<PathBuf>("file") {
+        let ext = file_path
+            .extension()
+            .expect("File must have an extension")
+            .to_str()
+            .unwrap();
+        (
+            std::fs::read_to_string(file_path)
+                .map_err(|e| Error::ParseError(format!("Failed to read file: {e}")))?,
+            ext,
+        )
+    } else {
+        return Err(Error::InvalidParams);
+    };
+
+    let output_ext = args
+        .get_one::<PathBuf>("output")
+        .expect("Output extension is required");
+
+    convert_graph(&input, output_ext, ext)?;
+
+    Ok(())
 }

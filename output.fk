@@ -1,0 +1,17 @@
+begin
+    s1
+    fork Ls3
+    s2
+    L0: join c1
+    s4
+    fork Ls8
+    s6
+    s7
+    L1: join c2
+    s10
+    Ls3: s3
+        goto L0
+    Ls8: s8
+        s9
+        goto L1
+end

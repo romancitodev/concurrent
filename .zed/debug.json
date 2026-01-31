@@ -1,0 +1,62 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  {
+    "adapter": "CodeLLDB",
+    "label": "cargo test -p concurrent --all-targets",
+    "build": {
+      "label": "cargo test -p concurrent --all-targets",
+      "command": "cargo",
+      "args": ["test", "--package", "concurrent", "--all-targets", "--no-run"],
+      "env": {
+        "RUSTC_TOOLCHAIN": "L:\\rust\\rustup\\toolchains\\stable-x86_64-pc-windows-msvc",
+      },
+      "cwd": "L:\\dev\\concurrent",
+      "use_new_terminal": false,
+      "allow_concurrent_runs": false,
+      "reveal": "always",
+      "reveal_target": "dock",
+      "hide": "never",
+      "tags": [],
+      "shell": "system",
+      "show_summary": false,
+      "show_command": false,
+    },
+    "sourceLanguages": ["rust"],
+  },
+  {
+    "adapter": "CodeLLDB",
+    "label": "cargo run render pdf",
+    "build": {
+      "label": "cargo run render -pdf -f ... -o ...",
+      "command": "cargo",
+      "args": [
+        "run",
+        "--package",
+        "concurrent",
+        "render",
+        "pdf",
+        "-f",
+        "test.fk",
+        "-o",
+        "hola.pdf",
+      ],
+      "env": {
+        "RUSTC_TOOLCHAIN": "L:\\rust\\rustup\\toolchains\\stable-x86_64-pc-windows-msvc",
+      },
+      "cwd": "L:\\dev\\concurrent",
+      "use_new_terminal": false,
+      "allow_concurrent_runs": false,
+      "reveal": "always",
+      "reveal_target": "dock",
+      "hide": "never",
+      "tags": [],
+      "shell": "system",
+      "show_summary": false,
+      "show_command": false,
+    },
+    "sourceLanguages": ["rust"],
+  },
+]
