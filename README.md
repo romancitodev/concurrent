@@ -17,7 +17,10 @@ cargo build --release
 ### Usage
 ```bash
 # Generate PDF from expression
-cargo run -- '$s0,{s1,s2},s3$' output.pdf
+cargo run --release -- render pdf -i '$s0,{s1,s2},s3$' -o output.pdf
+
+# Or using justfile
+just input '$s0,{s1,s2},s3$' output.pdf
 ```
 
 ### Syntax
@@ -79,7 +82,10 @@ cargo build --release
 ### Uso
 ```bash
 # Generar PDF desde una expresión
-cargo run -- '$s0,{s1,s2},s3$' salida.pdf
+cargo run --release -- render pdf -i '$s0,{s1,s2},s3$' -o salida.pdf
+
+# O usando justfile
+just input '$s0,{s1,s2},s3$' salida.pdf
 ```
 
 ### Sintaxis
