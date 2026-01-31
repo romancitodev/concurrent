@@ -61,7 +61,7 @@ $s0,{[s1,s2#{s1}],[s3,{s4,s5}]},s6$
 🚧 Fork/Join conversion (partial)  
 🚧 Parbegin/Parend conversion (partial)  
 
-### Examples
+### More Examples
 See [examples/](examples/) for `.graph` files and generated PDFs.
 
 ---
@@ -123,5 +123,5 @@ $s0,{[s1,s2#{s1}],[s3,{s4,s5}]},s6$
 🚧 Conversión Fork/Join (parcial)  
 🚧 Conversión Parbegin/Parend (parcial)  
 
-### Ejemplos
+### Más ejemplos
 Ver [examples/](examples/) para archivos `.graph` y PDFs generados.
