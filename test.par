@@ -1,0 +1,9 @@
+begin
+  s0
+  parbegin
+    s1
+    s2
+    s3
+  parend
+  s4
+end
