@@ -3,7 +3,7 @@ mod graph;
 mod render;
 mod validate;
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub use error::{Error, ValidationError, ValidationErrorKind};
 pub use graph::{ForkJoin, Graph, Ir, IrNode, Par, Unvalidated, Valid};
@@ -55,17 +55,17 @@ pub fn parse(input: &str, format: Format) -> Result<Graph<IrNode, Ir, Unvalidate
     Ok(ir)
 }
 
-pub fn render_to_pdf(svg: &str, path: &std::path::Path) -> Result<(), Error> {
+pub fn render_to_pdf(svg: &str, path: &Path) -> Result<(), Error> {
     render::render_svg_to_pdf(svg, path)
         .map_err(|e| Error::RenderError(format!("Failed to render PDF: {e}")))
 }
 
 pub fn process_graph_to_pdf(
     input: &str,
-    output_path: &std::path::Path,
+    output_path: &Path,
     ext: &str,
 ) -> Result<(), Error> {
-    let format = format_from_ext(ext)?;
+    let format = ext.try_into()?;
     let graph = parse_and_validate(input, format)?;
     let svg = graph.render_to_svg();
     render_to_pdf(&svg, output_path)
@@ -73,10 +73,10 @@ pub fn process_graph_to_pdf(
 
 pub fn process_graph_to_ir(
     input: &str,
-    output_path: &std::path::Path,
+    output_path: &Path,
     ext: &str,
 ) -> Result<(), Error> {
-    let format = format_from_ext(ext)?;
+    let format = ext.try_into()?;
 
     let ir = match format {
         Format::Ir => Graph::<IrNode, Ir>::parse(input)?,
@@ -99,8 +99,21 @@ fn format_from_ext(ext: &str) -> Result<Format, Error> {
     }
 }
 
+impl TryFrom<&str> for Format {
+    type Error = Error;
+
+    fn try_from(ext: &str) -> Result<Self, Self::Error> {
+    match ext {
+        "graph" => Ok(Format::Ir),
+        "par" => Ok(Format::Par),
+        "fk" => Ok(Format::ForkJoin),
+        _ => Err(Error::InvalidType(ext.to_string())),
+    }
+    }
+}
+
 pub fn convert_graph(input: &str, output: &Path, ex: &str) -> Result<(), Error> {
-    let format = format_from_ext(ex)?;
+    let format = ex.try_into()?;
     let graph = parse(input, format)?;
 
     let output_ext = output
@@ -109,7 +122,7 @@ pub fn convert_graph(input: &str, output: &Path, ex: &str) -> Result<(), Error> 
         .to_str()
         .unwrap();
 
-    let format_ext = format_from_ext(output_ext)?;
+    let format_ext = output_ext.try_into()?;
 
     let graph = match format_ext {
         Format::Ir => graph.to_string(),

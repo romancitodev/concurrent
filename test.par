@@ -1,0 +1,39 @@
+begin
+s1
+parbegin
+  begin
+    parbegin
+      begin
+        s2
+        sa
+      end
+      begin
+        s3
+        s9
+      end
+    parend
+    sg
+    parbegin
+      sj
+      sk
+    parend
+    sm
+  end
+  begin
+    parbegin
+      begin
+        s4
+        s8
+        sh
+      end
+      begin
+        s5
+        s7
+        si
+      end
+    parend
+    sn
+  end
+parend
+sp
+end

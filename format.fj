@@ -1,0 +1,14 @@
+begin
+a
+fork LB
+c
+fork LD
+e
+LF: join C2
+f
+goto end
+LB: b
+LD: join
+d
+goto LF
+end
