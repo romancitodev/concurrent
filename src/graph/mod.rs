@@ -157,12 +157,8 @@ impl<S> fmt::Display for Graph<fk::Stmt, ForkJoin, S> {
                     writeln!(f, "goto {target}")?;
                     in_branch = false;
                 }
-                fk::Node::Join(Some(target)) => {
+                fk::Node::Join(target) => {
                     writeln!(f, "join {target}")?;
-                    in_branch = false;
-                }
-                fk::Node::Join(None) => {
-                    writeln!(f, "join")?;
                     in_branch = false;
                 }
             }

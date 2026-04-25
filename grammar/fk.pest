@@ -29,7 +29,7 @@ Task = { Id ~ NEWLINE+ }
 
 // Helper rules
 IdList =  { Id ~ ("," ~ NEWLINE* ~ Id)* }
-Id     = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+Id     = @{ ("_")* ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
 WHITESPACE = _{ " " | "\t" }
 NEWLINE    = _{ "\n" | "\r\n" }
