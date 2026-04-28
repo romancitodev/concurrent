@@ -8,6 +8,7 @@ begin
     s5
     Ls8: join c4
     s8
+    L2: join L2
     Lsa: join c7
     sa
     goto _end

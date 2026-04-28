@@ -61,10 +61,16 @@ impl IrToFk {
 
     fn finalize(mut self) -> Graph {
         let branches = std::mem::take(&mut self.branches);
-        self.main_path.push(Stmt::new(None, Node::Goto { id: "_end".to_string() }));
-        self.main_path.push(Stmt::new(Some("_end".to_string()), Node::Final));
+        self.main_path.push(Stmt::new(
+            None,
+            Node::Goto {
+                id: "_end".to_string(),
+            },
+        ));
+        self.main_path
+            .push(Stmt::new(Some("_end".to_string()), Node::Final));
         for branch in branches {
-            self.expand_branch(branch.stmts);
+            self.expand_branch(branch.stmts, branch.target);
         }
         Graph::new(self.main_path)
     }
@@ -104,103 +110,130 @@ impl IrToFk {
                 self.convert_parallel(branches);
             }
             // We now that the only way to have a `Dep` node is as a dependency of an `Atomic` node, and we are already handling that case by recursively converting the dependencies before the atomic node itself.
-            ir::Node::Dep(id) => { }
+            ir::Node::Dep(id) => {}
         }
     }
 
     fn resolve_dependencies(&mut self, parent: &String, counter: String, deps: &[ir::Node]) {
-      if deps.is_empty() { return; }
-      let label = format!("L{parent}");
-      self.main_path.push(Stmt::new(Some(label.clone()), Node::Join { id: counter }));
-      for dep in deps {
-        assert!(matches!(dep, ir::Node::Dep(_)), "Only Dep nodes are allowed as dependencies");
-        self.dependencies.entry(parent.clone()).or_default().push(dep.id());
-      }
+        if deps.is_empty() {
+            return;
+        }
+        let label = format!("L{parent}");
+        self.main_path
+            .push(Stmt::new(Some(label.clone()), Node::Join { id: counter }));
+        for dep in deps {
+            assert!(
+                matches!(dep, ir::Node::Dep(_)),
+                "Only Dep nodes are allowed as dependencies"
+            );
+            self.dependencies
+                .entry(parent.clone())
+                .or_default()
+                .push(dep.id());
+        }
     }
 
     /// branches is the list of branches that we need to convert in parallel, and `to` is the label of the node that we need to join to after the branches are done.
     fn convert_parallel(&mut self, branches: &[ir::Node]) {
-      if branches.is_empty() { return; }
+        if branches.is_empty() {
+            return;
+        }
 
-      let join = format!("L{}", self.label_counter); // `self.label_counter` for example.
-      let forks = branches.iter().skip(1).map(|n| format!("L{}", n.id())).collect::<Vec<_>>();
+        let join = format!("L{}", self.label_counter); // `self.label_counter` for example.
+        let forks = branches
+            .iter()
+            .skip(1)
+            .map(|n| format!("L{}", n.id()))
+            .collect::<Vec<_>>();
 
-      // After doing the `deferred` branch, we need to "map" every fork into the main path.
-      // Example:
-      // $a,{[b,c],[d,e]},f$ then:
-      // begin
-      //  a
-      //  fork L{unknown} <--------- We are here
-      //  b
-      //  c
-      //  LF: join c1
-      //  f
-      //  goto end
-      //  L{unknown}: d
-      //              e
-      //              goto LF
-      //
-      // end
-      for fork in forks {
-        self.main_path.push(Stmt::new(None, Node::Fork { id: fork }));
-      }
+        // After doing the `deferred` branch, we need to "map" every fork into the main path.
+        // Example:
+        // $a,{[b,c],[d,e]},f$ then:
+        // begin
+        //  a
+        //  fork L{unknown} <--------- We are here
+        //  b
+        //  c
+        //  LF: join c1
+        //  f
+        //  goto end
+        //  L{unknown}: d
+        //              e
+        //              goto LF
+        //
+        // end
+        for fork in forks {
+            self.main_path
+                .push(Stmt::new(None, Node::Fork { id: fork }));
+        }
 
-      // We are going to take the first branch as the main. (the most-left branch will be the "main" path always).
-      let main_branch = &branches[0];
-      self.convert_node(main_branch, None);
+        // We are going to take the first branch as the main. (the most-left branch will be the "main" path always).
+        let main_branch = &branches[0];
+        self.convert_node(main_branch, None);
 
-      for branch in &branches[1..] {
-        let label = self.new_label();
-        self.branches.push(Branch {
-          label, // L{unknown}
-          stmts: branch.clone(), // the entire node.
-          target: join.clone(), // join LF.
-        });
-      }
+        let counter = format!("c{}", self.update_counter());
+        // FIXME: temporal fix, this works on `parallel.fk` but doesn't work on `terminal.fk`
+        self.main_path
+            .push(Stmt::new(Some(join.clone()), Node::Join { id: counter }));
 
+        for branch in &branches[1..] {
+            let label = self.new_label();
+            self.branches.push(Branch {
+                label,                 // L{unknown}
+                stmts: branch.clone(), // the entire node.
+                target: join.clone(),  // join LF.
+            });
+        }
     }
 
-    fn expand_branch(&mut self, branch: ir::Node) {
+    fn expand_branch(&mut self, branch: ir::Node, target: String) {
         match branch {
-          ir::Node::Atomic(label, _, _) => {
-            self.dependencies
-              .iter()
-              .filter(|(_, v)| v.contains(&label))
-              .for_each(|(k, _)| {
-                self.main_path.push(Stmt::new(None, Node::Goto { id: k.clone() }));
-              });
-          },
-          ir::Node::Par(branch) | ir::Node::Seq(branch) => {
-            for node in branch {
-              // In case we find a dependency of the current node, we resolve it instead of doing a fork, because the dependency will be already resolved in the main path.
-              // example:
-              // $a,{[b,c#{d}],[d,e]},f$ then:
-              // begin
-              //  a
-              //  fork LD
-              //  b
-              //  LC: c <---- now c have a label.
-              //  LF: join c1
-              //  f
-              //  goto end
-              //  LD: d
-              //      fork LC <---- now d have a dependency on c, so instead of doing a goto, we do a fork to the label of c.
-              //      e
-              //      goto LF
-              //
-              // end
-              // node.
-                let label = format!("L{}", Self::first_node_name(&node));
-                self.convert_node(&node, Some(label));
+            ir::Node::Atomic(label, _, _) => {
+                let labeled = format!("L{}", label);
+                self.main_path
+                    .push(Stmt::new(Some(labeled), Node::Atomic { id: label.clone() }));
                 self.dependencies
-                  .iter()
-                  .filter(|(_, v)| v.contains(&node.id()))
-                  .for_each(|(k, _)| {
-                    self.main_path.push(Stmt::new(None, Node::Fork { id: k.clone() }));
-                  });
+                    .iter()
+                    .filter(|(_, v)| v.contains(&label))
+                    .for_each(|(k, _)| {
+                        self.main_path
+                            .push(Stmt::new(None, Node::Fork { id: k.clone() }));
+                    });
+                self.main_path
+                    .push(Stmt::new(None, Node::Goto { id: target }));
             }
-          },
-          _ => unreachable!()
+            ir::Node::Par(branch) | ir::Node::Seq(branch) => {
+                for node in branch {
+                    // In case we find a dependency of the current node, we resolve it instead of doing a fork, because the dependency will be already resolved in the main path.
+                    // example:
+                    // $a,{[b,c#{d}],[d,e]},f$ then:
+                    // begin
+                    //  a
+                    //  fork LD
+                    //  b
+                    //  LC: c <---- now c have a label.
+                    //  LF: join c1
+                    //  f
+                    //  goto end
+                    //  LD: d
+                    //      fork LC <---- now d have a dependency on c, so instead of doing a goto, we do a fork to the label of c.
+                    //      e
+                    //      goto LF
+                    //
+                    // end
+                    // node.
+                    let label = format!("L{}", Self::first_node_name(&node));
+                    self.convert_node(&node, Some(label));
+                    self.dependencies
+                        .iter()
+                        .filter(|(_, v)| v.contains(&node.id()))
+                        .for_each(|(k, _)| {
+                            self.main_path
+                                .push(Stmt::new(None, Node::Fork { id: k.clone() }));
+                        });
+                }
+            }
+            _ => unreachable!(),
         }
     }
 
