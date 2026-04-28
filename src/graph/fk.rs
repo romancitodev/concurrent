@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use pest::Parser;
 use pest::error::Error;
 use pest::iterators::{Pair, Pairs};
@@ -27,21 +29,26 @@ impl Graph {
 
 struct Branch {
     label: String,
-    stmts: Vec<Stmt>,
-    goto_target: String,
+    /// we know that we always have a `Par(Vec<Node>)` or `Seq(Vec<Node>)` node here
+    stmts: ir::Node,
+    target: String,
 }
 
+type Id = String;
+
 struct IrToFk {
-    main_stmts: Vec<Stmt>,
-    deferred_branches: Vec<Branch>,
+    dependencies: HashMap<Id, Vec<Id>>,
+    main_path: Vec<Stmt>,
+    branches: Vec<Branch>,
     label_counter: usize,
 }
 
 impl IrToFk {
     fn new() -> Self {
         Self {
-            main_stmts: Vec::new(),
-            deferred_branches: Vec::new(),
+            dependencies: HashMap::new(),
+            main_path: Vec::new(),
+            branches: Vec::new(),
             label_counter: 0,
         }
     }
@@ -53,34 +60,42 @@ impl IrToFk {
     }
 
     fn finalize(mut self) -> Graph {
-        let mut result = self.main_stmts;
-        for branch in self.deferred_branches.drain(..) {
-            if let Some(first) = branch.stmts.first() {
-                result.push(Stmt::new(Some(branch.label), first.node.clone()));
-                for stmt in branch.stmts.into_iter().skip(1) {
-                    result.push(stmt);
-                }
-                result.push(Stmt::new(None, Node::Goto(branch.goto_target)));
-            }
+        let branches = std::mem::take(&mut self.branches);
+        self.main_path.push(Stmt::new(None, Node::Goto { id: "_end".to_string() }));
+        self.main_path.push(Stmt::new(Some("_end".to_string()), Node::Final));
+        for branch in branches {
+            self.expand_branch(branch.stmts);
         }
-        Graph::new(result)
+        Graph::new(self.main_path)
     }
 
     fn convert_nodes(&mut self, nodes: &[ir::Node]) {
         for node in nodes {
-            self.convert_node(node);
+            self.convert_node(node, None);
         }
     }
 
-    fn convert_node(&mut self, node: &ir::Node) {
+    fn update_counter(&mut self) -> usize {
+        let current = self.label_counter;
+        self.label_counter += 1;
+        current
+    }
+
+    fn convert_node(&mut self, node: &ir::Node, label: Option<String>) {
         match node {
-            ir::Node::Atomic(name, _, is_terminal) => {
-                self.main_stmts
-                    .push(Stmt::new(None, Node::Atomic(name.clone())));
-                if *is_terminal {
-                    self.main_stmts
-                        .push(Stmt::new(None, Node::Goto("end".to_string())));
-                }
+            ir::Node::Atomic(name, deps, _) => {
+                // because we are resolving the deps after the atomic node itself, the behaviour is gonna be bottom-to-top.
+                // this means that if we have the node B and C that precedes A, when we analyze B as a dep, we need the parent node.
+                // but that means we need to keep also a field like `from` and `to`, and we need to keep track of the current node we are analyzing, and pass it to the recursive calls.
+                let counter = format!("c{}", self.update_counter());
+                self.resolve_dependencies(name, counter, deps.as_ref());
+
+                self.main_path
+                    .push(Stmt::new(label.clone(), Node::Atomic { id: name.clone() }));
+                // if *is_terminal {
+                //     self.main_path
+                //         .push(Stmt::new(label, Node::Final));
+                // }
             }
             ir::Node::Seq(children) => {
                 self.convert_nodes(children);
@@ -88,52 +103,104 @@ impl IrToFk {
             ir::Node::Par(branches) => {
                 self.convert_parallel(branches);
             }
-            ir::Node::Dep(_) => {}
+            // We now that the only way to have a `Dep` node is as a dependency of an `Atomic` node, and we are already handling that case by recursively converting the dependencies before the atomic node itself.
+            ir::Node::Dep(id) => { }
         }
     }
 
+    fn resolve_dependencies(&mut self, parent: &String, counter: String, deps: &[ir::Node]) {
+      if deps.is_empty() { return; }
+      let label = format!("L{parent}");
+      self.main_path.push(Stmt::new(Some(label.clone()), Node::Join { id: counter }));
+      for dep in deps {
+        assert!(matches!(dep, ir::Node::Dep(_)), "Only Dep nodes are allowed as dependencies");
+        self.dependencies.entry(parent.clone()).or_default().push(dep.id());
+      }
+    }
+
+    /// branches is the list of branches that we need to convert in parallel, and `to` is the label of the node that we need to join to after the branches are done.
     fn convert_parallel(&mut self, branches: &[ir::Node]) {
-        if branches.is_empty() {
-            return;
-        }
-        if branches.len() == 1 {
-            self.convert_node(&branches[0]);
-            return;
-        }
+      if branches.is_empty() { return; }
 
-        let join_label = self.new_label();
-        let join_counter = format!("c{}", self.label_counter);
+      let join = format!("L{}", self.label_counter); // `self.label_counter` for example.
+      let forks = branches.iter().skip(1).map(|n| format!("L{}", n.id())).collect::<Vec<_>>();
 
-        let branch_labels: Vec<String> = branches[1..]
-            .iter()
-            .map(|branch| format!("L{}", Self::first_node_name(branch)))
-            .collect();
+      // After doing the `deferred` branch, we need to "map" every fork into the main path.
+      // Example:
+      // $a,{[b,c],[d,e]},f$ then:
+      // begin
+      //  a
+      //  fork L{unknown} <--------- We are here
+      //  b
+      //  c
+      //  LF: join c1
+      //  f
+      //  goto end
+      //  L{unknown}: d
+      //              e
+      //              goto LF
+      //
+      // end
+      for fork in forks {
+        self.main_path.push(Stmt::new(None, Node::Fork { id: fork }));
+      }
 
-        for label in &branch_labels {
-            self.main_stmts
-                .push(Stmt::new(None, Node::Fork(label.clone())));
-        }
+      // We are going to take the first branch as the main. (the most-left branch will be the "main" path always).
+      let main_branch = &branches[0];
+      self.convert_node(main_branch, None);
 
-        self.convert_node(&branches[0]);
+      for branch in &branches[1..] {
+        let label = self.new_label();
+        self.branches.push(Branch {
+          label, // L{unknown}
+          stmts: branch.clone(), // the entire node.
+          target: join.clone(), // join LF.
+        });
+      }
 
-        self.main_stmts.push(Stmt::new(
-            Some(join_label.clone()),
-            Node::Join(Some(join_counter)),
-        ));
+    }
 
-        for (i, branch) in branches[1..].iter().enumerate() {
-            let mut branch_conv = IrToFk::new();
-            branch_conv.label_counter = self.label_counter;
-            branch_conv.convert_node(branch);
-            self.label_counter = branch_conv.label_counter;
-
-            self.deferred_branches.push(Branch {
-                label: branch_labels[i].clone(),
-                stmts: branch_conv.main_stmts,
-                goto_target: join_label.clone(),
-            });
-
-            self.deferred_branches.extend(branch_conv.deferred_branches);
+    fn expand_branch(&mut self, branch: ir::Node) {
+        match branch {
+          ir::Node::Atomic(label, _, _) => {
+            self.dependencies
+              .iter()
+              .filter(|(_, v)| v.contains(&label))
+              .for_each(|(k, _)| {
+                self.main_path.push(Stmt::new(None, Node::Goto { id: k.clone() }));
+              });
+          },
+          ir::Node::Par(branch) | ir::Node::Seq(branch) => {
+            for node in branch {
+              // In case we find a dependency of the current node, we resolve it instead of doing a fork, because the dependency will be already resolved in the main path.
+              // example:
+              // $a,{[b,c#{d}],[d,e]},f$ then:
+              // begin
+              //  a
+              //  fork LD
+              //  b
+              //  LC: c <---- now c have a label.
+              //  LF: join c1
+              //  f
+              //  goto end
+              //  LD: d
+              //      fork LC <---- now d have a dependency on c, so instead of doing a goto, we do a fork to the label of c.
+              //      e
+              //      goto LF
+              //
+              // end
+              // node.
+                let label = format!("L{}", Self::first_node_name(&node));
+                self.convert_node(&node, Some(label));
+                self.dependencies
+                  .iter()
+                  .filter(|(_, v)| v.contains(&node.id()))
+                  .for_each(|(k, _)| {
+                    self.main_path.push(Stmt::new(None, Node::Fork { id: k.clone() }));
+                  });
+            }
+          },
+          _ => unreachable!()
         }
     }
 
@@ -161,10 +228,11 @@ impl Stmt {
 
 #[derive(Debug, Clone)]
 pub enum Node {
-    Join(Option<String>),
-    Goto(String),
-    Fork(String),
-    Atomic(String),
+    Final,
+    Join { id: String },
+    Goto { id: String },
+    Fork { id: String },
+    Atomic { id: String },
 }
 
 #[derive(Parser)]
@@ -218,19 +286,19 @@ fn parse_node(pair: Pair<Rule>) -> Node {
     match pair.as_rule() {
         Rule::Task => {
             let id = pair.into_inner().next().unwrap().as_str().to_string();
-            Node::Atomic(id)
+            Node::Atomic { id }
         }
         Rule::Fork => {
             let id = pair.into_inner().next().unwrap().as_str().to_string();
-            Node::Fork(id)
+            Node::Fork { id }
         }
         Rule::Goto => {
             let id = pair.into_inner().next().unwrap().as_str().to_string();
-            Node::Goto(id)
+            Node::Goto { id }
         }
         Rule::Join => {
-            let id = pair.into_inner().next().map(|p| p.as_str().to_string());
-            Node::Join(id)
+            let id = pair.into_inner().next().unwrap().as_str().to_string();
+            Node::Join { id }
         }
         _ => unreachable!(),
     }

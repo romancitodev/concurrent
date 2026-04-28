@@ -69,14 +69,16 @@ impl ControlFlowGraph {
 
         for (idx, stmt) in graph.0.iter().enumerate() {
             match &stmt.node {
-                fk::Node::Goto(target_label) => {
-                    if target_label != "end"
-                        && let Some(&target_idx) = cfg.labels.get(target_label)
+                fk::Node::Final =>  {
+                      // No outgoing edges from final node
+                }
+                fk::Node::Goto { id: target_label } => {
+                    if let Some(&target_idx) = cfg.labels.get(target_label)
                     {
                         cfg.edges.push((idx, target_idx));
                     }
                 }
-                fk::Node::Fork(target_label) => {
+                  fk::Node::Fork { id: target_label } => {
                     if let Some(&target_idx) = cfg.labels.get(target_label) {
                         cfg.edges.push((idx, target_idx));
                     }
@@ -84,7 +86,7 @@ impl ControlFlowGraph {
                         cfg.edges.push((idx, idx + 1));
                     }
                 }
-                fk::Node::Atomic(_) | fk::Node::Join(_) => {
+                fk::Node::Atomic { .. } | fk::Node::Join { .. } => {
                     if idx + 1 < graph.0.len() {
                         cfg.edges.push((idx, idx + 1));
                     }
@@ -121,12 +123,12 @@ impl ControlFlowGraph {
             };
 
             match node {
-                fk::Node::Atomic(name) => {
+                fk::Node::Atomic { id: name } => {
                     global_visited.insert(current);
                     regions.push(Region::Atomic { name: name.clone() });
                     current += 1;
                 }
-                fk::Node::Fork(target_label) => {
+                fk::Node::Fork { id: target_label } => {
                     global_visited.insert(current);
 
                     // Find the join point - it's where all forked branches converge
@@ -140,7 +142,7 @@ impl ControlFlowGraph {
 
                     // Check for consecutive forks
                     let mut check_idx = current + 1;
-                    while let Some(fk::Node::Fork(next_target)) = self.nodes.get(&check_idx) {
+                    while let Some(fk::Node::Fork { id: next_target}) = self.nodes.get(&check_idx) {
                         global_visited.insert(check_idx);
                         if let Some(&target_idx) = self.labels.get(next_target) {
                             fork_targets.push(target_idx);
@@ -172,12 +174,12 @@ impl ControlFlowGraph {
                         break;
                     }
                 }
-                fk::Node::Join(_) => {
+                fk::Node::Join { .. } => {
                     // Join encountered outside of fork processing - skip it
                     global_visited.insert(current);
                     current += 1;
                 }
-                fk::Node::Goto(target) => {
+                fk::Node::Goto { id: target } => {
                     global_visited.insert(current);
                     if target == "end" {
                         break;
@@ -191,6 +193,9 @@ impl ControlFlowGraph {
                     } else {
                         break;
                     }
+                }
+                fk::Node::Final => {
+
                 }
             }
         }
@@ -224,12 +229,12 @@ impl ControlFlowGraph {
             };
 
             match node {
-                fk::Node::Atomic(name) => {
+                fk::Node::Atomic { id: name } => {
                     global_visited.insert(current);
                     regions.push(Region::Atomic { name: name.clone() });
                     current += 1;
                 }
-                fk::Node::Fork(target_label) => {
+                fk::Node::Fork { id: target_label } => {
                     global_visited.insert(current);
 
                     // Nested fork - find its join
@@ -242,7 +247,7 @@ impl ControlFlowGraph {
 
                     // Check for consecutive forks
                     let mut check_idx = current + 1;
-                    while let Some(fk::Node::Fork(next_target)) = self.nodes.get(&check_idx) {
+                    while let Some(fk::Node::Fork { id: next_target }) = self.nodes.get(&check_idx) {
                         global_visited.insert(check_idx);
                         if let Some(&target_idx) = self.labels.get(next_target) {
                             fork_targets.push(target_idx);
@@ -271,15 +276,12 @@ impl ControlFlowGraph {
                         break;
                     }
                 }
-                fk::Node::Join(_) => {
+                fk::Node::Join { .. } => {
                     // This should be our target join or we've hit another join
                     break;
                 }
-                fk::Node::Goto(target) => {
+                fk::Node::Goto { id: target } => {
                     global_visited.insert(current);
-                    if target == "end" {
-                        break;
-                    }
                     // Check if goto leads to the join point
                     if let Some(&target_idx) = self.labels.get(target) {
                         if Some(target_idx) == join_idx {
@@ -292,7 +294,8 @@ impl ControlFlowGraph {
                     } else {
                         break;
                     }
-                }
+                },
+                fk::Node::Final => {}
             }
         }
 
@@ -305,7 +308,7 @@ impl ControlFlowGraph {
 
         // First, skip over any consecutive forks (they share the same join)
         let mut current = fork_idx + 1;
-        while let Some(fk::Node::Fork(_)) = self.nodes.get(&current) {
+        while let Some(fk::Node::Fork { .. }) = self.nodes.get(&current) {
             current += 1;
         }
 
@@ -318,10 +321,10 @@ impl ControlFlowGraph {
             visited.insert(current);
 
             match node {
-                fk::Node::Join(_) => {
+                fk::Node::Join { .. } => {
                     return Some(current);
                 }
-                fk::Node::Fork(_) => {
+                fk::Node::Fork { .. } => {
                     // Nested fork - skip to its join first
                     if let Some(nested_join) = self.find_join_for_fork(current) {
                         current = nested_join + 1;
@@ -329,10 +332,10 @@ impl ControlFlowGraph {
                         current += 1;
                     }
                 }
-                fk::Node::Atomic(_) => {
+                fk::Node::Atomic { .. } | fk::Node::Final => {
                     current += 1;
                 }
-                fk::Node::Goto(target) => {
+                fk::Node::Goto { id: target } => {
                     if target == "end" {
                         break;
                     }

@@ -30,6 +30,15 @@ pub enum Node {
     Dep(String),
 }
 
+impl Node {
+  pub fn id(&self) -> String {
+    match self {
+        Node::Atomic(id, _, _) | Node::Dep(id) => id.clone(),
+        Node::Par(b) | Node::Seq(b) => b.first().map(Node::id).unwrap(),
+    }
+  }
+}
+
 #[derive(Parser)]
 #[grammar = "../grammar/lang.pest"]
 struct IrParser;

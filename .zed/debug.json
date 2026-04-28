@@ -59,4 +59,30 @@
     },
     "sourceLanguages": ["rust"],
   },
+  {
+    "request": "launch",
+    "adapter": "CodeLLDB",
+    "label": "convert IR to Fork-Join",
+    "sourceLanguages": ["rust"],
+    "cwd": "L:\\dev\\concurrent",
+    "program": "target/debug/concurrent.exe",
+    "args": [
+      "convert",
+      "-f",
+      "examples/terminal.graph",
+      "-o",
+      "output/terminal.fk",
+    ],
+    "inputs": {},
+    "build": {
+      "cwd": "L:\\dev\\concurrent",
+      "command": "cargo",
+      "args": ["build", "--package", "concurrent"],
+      "use_new_terminal": false,
+      "hide": "always",
+      "env": {
+        "RUSTC_TOOLCHAIN": "L:\\rust\\rustup\\toolchains\\stable-x86_64-pc-windows-msvc",
+      },
+    },
+  },
 ]

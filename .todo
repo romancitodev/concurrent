@@ -1,0 +1,3 @@
+- [ ] Fix the bug that doesn't resolve dependencies from the IR to the Fork / Join.
+  - [ ] Resolve dependencies
+  - [ ] Map them
