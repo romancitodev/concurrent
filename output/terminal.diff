@@ -8,18 +8,23 @@ begin
     s5
     Ls8: join c4
     s8
-    L2: join L2
     Lsa: join c7
     sa
     goto _end
     _end: end
     Ls3: s3
-        fork s5
-    Ls6: s6
-        fork s8
++       fork Ls5
+        s6
+-       fork s9
++       fork Ls9
+-       fork s8
++       goto Ls8
+-       goto L2
     Ls4: s4
-    Ls7: s7
+        s7
     Ls9: join c12
-    Ls9: s9
-        fork sa
+    s9
+-   fork sa
++   goto Lsa
+-   goto L2
 end

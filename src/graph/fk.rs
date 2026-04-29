@@ -22,7 +22,7 @@ impl Graph {
 
     pub fn from_ir(ir: &ir::Graph) -> Self {
         let mut conv = IrToFk::new();
-        conv.convert_nodes(&ir.0);
+        conv.build(&ir.0);
         conv.finalize()
     }
 }
@@ -75,6 +75,37 @@ impl IrToFk {
         Graph::new(self.main_path)
     }
 
+    fn build(&mut self, nodes: &[ir::Node]) {
+      self.fetch_dependencies(nodes);
+      self.convert_nodes(nodes);
+    }
+
+    fn fetch_dependencies(&mut self, nodes: &[ir::Node]) {
+        for node in nodes {
+            match node {
+                ir::Node::Atomic(parent, deps, _) => {
+                  if deps.is_empty() {
+                      continue;
+                  }
+                  for dep in deps {
+                      assert!(
+                          matches!(dep, ir::Node::Dep(_)),
+                          "Only Dep nodes are allowed as dependencies"
+                      );
+                      self.dependencies
+                          .entry(parent.clone())
+                          .or_default()
+                          .push(dep.id());
+                  }
+                }
+                ir::Node::Seq(children) | ir::Node::Par(children) => {
+                    self.fetch_dependencies(children);
+                }
+                ir::Node::Dep(_) => {}
+            }
+        }
+    }
+
     fn convert_nodes(&mut self, nodes: &[ir::Node]) {
         for node in nodes {
             self.convert_node(node, None);
@@ -89,19 +120,10 @@ impl IrToFk {
 
     fn convert_node(&mut self, node: &ir::Node, label: Option<String>) {
         match node {
-            ir::Node::Atomic(name, deps, _) => {
-                // because we are resolving the deps after the atomic node itself, the behaviour is gonna be bottom-to-top.
-                // this means that if we have the node B and C that precedes A, when we analyze B as a dep, we need the parent node.
-                // but that means we need to keep also a field like `from` and `to`, and we need to keep track of the current node we are analyzing, and pass it to the recursive calls.
-                let counter = format!("c{}", self.update_counter());
-                self.resolve_dependencies(name, counter, deps.as_ref());
-
+            ir::Node::Atomic(name, _, _) => {
+                self.resolve_dependencies(name);
                 self.main_path
                     .push(Stmt::new(label.clone(), Node::Atomic { id: name.clone() }));
-                // if *is_terminal {
-                //     self.main_path
-                //         .push(Stmt::new(label, Node::Final));
-                // }
             }
             ir::Node::Seq(children) => {
                 self.convert_nodes(children);
@@ -114,26 +136,18 @@ impl IrToFk {
         }
     }
 
-    fn resolve_dependencies(&mut self, parent: &String, counter: String, deps: &[ir::Node]) {
-        if deps.is_empty() {
-            return;
-        }
-        let label = format!("L{parent}");
-        self.main_path
-            .push(Stmt::new(Some(label.clone()), Node::Join { id: counter }));
-        for dep in deps {
-            assert!(
-                matches!(dep, ir::Node::Dep(_)),
-                "Only Dep nodes are allowed as dependencies"
-            );
-            self.dependencies
-                .entry(parent.clone())
-                .or_default()
-                .push(dep.id());
+    /// parent: L{parent}
+    /// counter: c{counter}
+    /// deps: Vec<Node>
+    fn resolve_dependencies(&mut self, parent: &String) {
+        let id = format!("L{parent}");
+        let counter = format!("c{}", self.update_counter());
+        if let Some(deps) = self.dependencies.get(parent) && !deps.is_empty() {
+          self.main_path.push(Stmt::new(Some(id.clone()), Node::Join { id: counter.clone() }));
         }
     }
 
-    /// branches is the list of branches that we need to convert in parallel, and `to` is the label of the node that we need to join to after the branches are done.
+    /// branches is the list of branches that we need to convert in parallel.
     fn convert_parallel(&mut self, branches: &[ir::Node]) {
         if branches.is_empty() {
             return;
@@ -189,7 +203,7 @@ impl IrToFk {
     fn expand_branch(&mut self, branch: ir::Node, target: String) {
         match branch {
             ir::Node::Atomic(label, _, _) => {
-                let labeled = format!("L{}", label);
+                let labeled = format!("L{label}");
                 self.main_path
                     .push(Stmt::new(Some(labeled), Node::Atomic { id: label.clone() }));
                 self.dependencies
@@ -203,7 +217,11 @@ impl IrToFk {
                     .push(Stmt::new(None, Node::Goto { id: target }));
             }
             ir::Node::Par(branch) | ir::Node::Seq(branch) => {
-                for node in branch {
+              let first_node = branch.first().expect("Branch should have at least one node");
+              let label = Self::first_node_name(first_node);
+              let labeled = format!("L{label}");
+              self.convert_node(first_node, Some(labeled));
+                for node in &branch[1..] {
                     // In case we find a dependency of the current node, we resolve it instead of doing a fork, because the dependency will be already resolved in the main path.
                     // example:
                     // $a,{[b,c#{d}],[d,e]},f$ then:
@@ -222,8 +240,7 @@ impl IrToFk {
                     //
                     // end
                     // node.
-                    let label = format!("L{}", Self::first_node_name(&node));
-                    self.convert_node(&node, Some(label));
+                    self.convert_node(node, None);
                     self.dependencies
                         .iter()
                         .filter(|(_, v)| v.contains(&node.id()))
@@ -232,6 +249,8 @@ impl IrToFk {
                                 .push(Stmt::new(None, Node::Fork { id: k.clone() }));
                         });
                 }
+                self.main_path
+                    .push(Stmt::new(None, Node::Goto { id: target }));
             }
             _ => unreachable!(),
         }
