@@ -3,7 +3,7 @@ begin
     fork Ls2
     fork Ls3
     s1
-    Ls1: join c2
+    Ls1: join c0
     s4
     goto _end
     _end: end

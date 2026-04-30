@@ -8,19 +8,19 @@ begin
     s5
     Ls8: join c1
     s8
+    goto Lsa
     Lsa: join c4
     sa
     goto _end
     _end: end
     Ls3: s3
-        s6
-        fork Ls8
-        goto Ls9
-    goto Ls5
+        goto Ls5
+    s6
+    fork Ls9
+    goto Ls8
     Ls4: s4
         s7
     Ls9: join c5
     s9
     goto Lsa
-    goto Ls5
 end

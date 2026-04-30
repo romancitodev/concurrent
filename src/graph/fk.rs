@@ -39,8 +39,9 @@ type Id = String;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Ctx {
-    Main,
-    Deferred,
+    Main,         // main path
+    Deferred,     // on branch path
+    LastDeferred, // last deferred node
 }
 
 struct IrToFk {
@@ -131,6 +132,7 @@ impl IrToFk {
                 self.resolve_dependencies(name);
                 self.main_path
                     .push(Stmt::new(label.clone(), Node::Atomic { id: name.clone() }));
+                // I need to check some way if the node itself it's the last on the branch, so we can avoid writing `fork` and `goto` for it.
                 self.post_dependencies(name, ctx);
             }
             ir::Node::Seq(children) => {
@@ -145,7 +147,7 @@ impl IrToFk {
     }
 
     fn post_dependencies(&mut self, parent: &String, ctx: Ctx) {
-        if ctx == Ctx::Deferred {
+        if ctx == Ctx::LastDeferred {
             return;
         }
         self.dependencies
@@ -155,7 +157,7 @@ impl IrToFk {
                 self.main_path.push(Stmt::new(
                     None,
                     Node::Goto {
-                        id: format!("L{}", k),
+                        id: format!("L{k}"),
                     },
                 ))
             });
@@ -250,6 +252,8 @@ impl IrToFk {
                 let labeled = format!("L{label}");
                 self.main_path
                     .push(Stmt::new(Some(labeled), Node::Atomic { id: label.clone() }));
+
+                // this is what post_dependencies does
                 self.dependencies
                     .iter()
                     .filter(|(_, v)| v.contains(&label))
@@ -286,7 +290,12 @@ impl IrToFk {
                     //
                     // end
                     // node.
-                    self.convert_node(node, None, Ctx::Deferred);
+                    let ctx = if node.last_node().is_some_and(|n| n == node) {
+                        Ctx::LastDeferred
+                    } else {
+                        Ctx::Deferred
+                    };
+                    self.convert_node(node, None, ctx);
                     let mut dependencies = self
                         .dependencies
                         .iter()
@@ -317,8 +326,14 @@ impl IrToFk {
                         },
                     ));
                 }
-                self.main_path
-                    .push(Stmt::new(None, Node::Goto { id: target }));
+                if self
+                    .main_path
+                    .last()
+                    .is_some_and(|n| !matches!(n.node, Node::Goto { .. }))
+                {
+                    self.main_path
+                        .push(Stmt::new(None, Node::Goto { id: target }));
+                }
             }
             _ => unreachable!(),
         }
