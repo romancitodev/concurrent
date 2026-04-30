@@ -60,22 +60,14 @@ pub fn render_to_pdf(svg: &str, path: &Path) -> Result<(), Error> {
         .map_err(|e| Error::RenderError(format!("Failed to render PDF: {e}")))
 }
 
-pub fn process_graph_to_pdf(
-    input: &str,
-    output_path: &Path,
-    ext: &str,
-) -> Result<(), Error> {
+pub fn process_graph_to_pdf(input: &str, output_path: &Path, ext: &str) -> Result<(), Error> {
     let format = ext.try_into()?;
     let graph = parse_and_validate(input, format)?;
     let svg = graph.render_to_svg();
     render_to_pdf(&svg, output_path)
 }
 
-pub fn process_graph_to_ir(
-    input: &str,
-    output_path: &Path,
-    ext: &str,
-) -> Result<(), Error> {
+pub fn process_graph_to_ir(input: &str, output_path: &Path, ext: &str) -> Result<(), Error> {
     let format = ext.try_into()?;
 
     let ir = match format {
@@ -103,12 +95,12 @@ impl TryFrom<&str> for Format {
     type Error = Error;
 
     fn try_from(ext: &str) -> Result<Self, Self::Error> {
-    match ext {
-        "graph" => Ok(Format::Ir),
-        "par" => Ok(Format::Par),
-        "fk" => Ok(Format::ForkJoin),
-        _ => Err(Error::InvalidType(ext.to_string())),
-    }
+        match ext {
+            "graph" => Ok(Format::Ir),
+            "par" => Ok(Format::Par),
+            "fk" => Ok(Format::ForkJoin),
+            _ => Err(Error::InvalidType(ext.to_string())),
+        }
     }
 }
 

@@ -31,12 +31,20 @@ pub enum Node {
 }
 
 impl Node {
-  pub fn id(&self) -> String {
-    match self {
-        Node::Atomic(id, _, _) | Node::Dep(id) => id.clone(),
-        Node::Par(b) | Node::Seq(b) => b.first().map(Node::id).unwrap(),
+    pub fn id(&self) -> String {
+        match self {
+            Node::Atomic(id, _, _) | Node::Dep(id) => id.clone(),
+            Node::Par(b) | Node::Seq(b) => b.first().map(Node::id).unwrap(),
+        }
     }
-  }
+
+    pub fn last_node(&self) -> Option<&Node> {
+        match self {
+            Node::Par(b) | Node::Seq(b) => b.last().map(|n| n.last_node()).flatten(),
+            Node::Atomic(_, _, _) => Some(self),
+            _ => None, // We don't want to catch the last dep node.
+        }
+    }
 }
 
 #[derive(Parser)]

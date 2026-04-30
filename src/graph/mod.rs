@@ -151,10 +151,10 @@ impl<S> fmt::Display for Graph<fk::Stmt, ForkJoin, S> {
                 write!(f, "{indent}")?;
             }
             match &stmt.node {
-              fk::Node::Final => { writeln!(f, "end")? },
-              fk::Node::Atomic { id: name } => writeln!(f, "{name}")?,
-              fk::Node::Fork { id: target } => writeln!(f, "fork {target}")?,
-              fk::Node::Goto { id: target } => {
+                fk::Node::Final => writeln!(f, "end")?,
+                fk::Node::Atomic { id: name } => writeln!(f, "{name}")?,
+                fk::Node::Fork { id: target } => writeln!(f, "fork {target}")?,
+                fk::Node::Goto { id: target } => {
                     writeln!(f, "goto {target}")?;
                     in_branch = false;
                 }
