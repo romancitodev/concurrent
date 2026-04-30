@@ -4,23 +4,22 @@ begin
     fork Ls3
     fork Ls4
     s2
-    Ls5: join c0
+    Ls5: join c1
     s5
-    Ls8: join c1
+    Ls8: join c2
     s8
-    goto Lsa
-    Lsa: join c4
+    Lsa: join c3
     sa
     goto _end
     _end: end
     Ls3: s3
-        goto Ls5
-    s6
-    fork Ls9
-    goto Ls8
+        fork Ls5
+        s6
+        fork Ls8
+        goto Ls9
     Ls4: s4
         s7
-    Ls9: join c5
+    Ls9: join c4
     s9
     goto Lsa
 end
