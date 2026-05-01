@@ -431,17 +431,16 @@ impl ControlFlowGraph {
                         break;
                     }
                     // Check if goto leads to the join point
-                    if let Some(&target_idx) = self.labels.get(target) {
-                        if Some(target_idx) == join_idx {
-                            break;
-                        }
-                        if global_visited.contains(&target_idx) {
-                            break;
-                        }
-                        current = target_idx;
-                    } else {
+                    let Some(&target_idx) = self.labels.get(target) else {
+                        break;
+                    };
+                    if Some(target_idx) == join_idx {
                         break;
                     }
+                    if global_visited.contains(&target_idx) {
+                        break;
+                    }
+                    current = target_idx;
                 }
                 fk::Node::Final => {}
             }
@@ -463,9 +462,7 @@ impl ControlFlowGraph {
         while let Some(node) = self.nodes.get(&current) {
             match node {
                 fk::Node::Fork { id } => {
-                    if ctx.join_labels.contains_key(id)
-                        && let Some(dep) = ctx.join_labels.get(id)
-                    {
+                    if let Some(dep) = ctx.join_labels.get(id) {
                         ctx.dependency_join_labels.insert(id.clone());
                         dependents.push(dep.clone());
                         current += 1;
@@ -474,12 +471,8 @@ impl ControlFlowGraph {
                     break;
                 }
                 fk::Node::Goto { id } => {
-                    let mut is_structural_join = false;
-                    if let Some(&target_idx) = self.labels.get(id)
-                        && Some(target_idx) == stop_join_idx
-                    {
-                        is_structural_join = true;
-                    }
+                    let is_structural_join = self.labels.get(id).map(|i| *i) == stop_join_idx;
+
                     if !is_structural_join && let Some(dep) = ctx.join_labels.get(id) {
                         ctx.dependency_join_labels.insert(id.clone());
                         dependents.push(dep.clone());
