@@ -64,7 +64,9 @@ impl<S> Graph<fk::Stmt, ForkJoin, S> {
 
     pub fn to_ir(self) -> Graph<ir::Node, Ir, S> {
         let fk_graph = fk::Graph::new(self.0);
-        Graph::new(fk_graph.to_ir().0)
+        let g = Graph::new(fk_graph.to_ir().0);
+        println!("{g:?}");
+        g
     }
 }
 

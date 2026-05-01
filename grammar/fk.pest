@@ -17,10 +17,10 @@ UnlabeledStatement = {
 Label = { Id ~ ":" ~ NEWLINE* }
 
 // Fork puede crear múltiples threads
-Fork = { "fork" ~ IdList ~ NEWLINE+ }
+Fork = { "fork" ~ Id ~ NEWLINE+ }
 
 // Join puede esperar múltiples threads (opcional)
-Join = { "join" ~ IdList? ~ NEWLINE+ }
+Join = { "join" ~ Id? ~ NEWLINE+ }
 // join o join L1, L2
 
 Goto = { "goto" ~ Id ~ NEWLINE+ }
@@ -28,8 +28,7 @@ Goto = { "goto" ~ Id ~ NEWLINE+ }
 Task = { Id ~ NEWLINE+ }
 
 // Helper rules
-IdList =  { Id ~ ("," ~ NEWLINE* ~ Id)* }
-Id     = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
+Id = @{ "_"* ~ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
 
 WHITESPACE = _{ " " | "\t" }
 NEWLINE    = _{ "\n" | "\r\n" }
