@@ -161,16 +161,12 @@ impl IrToFk {
 
     fn convert_node(&mut self, node: &ir::Node, label: Option<String>, ctx: Ctx) {
         match node {
-            ir::Node::Atomic(name, _, is_terminal) => {
+            ir::Node::Atomic(name, _, _) => {
                 self.resolve_dependencies(name);
                 self.main_path
                     .push(Stmt::new(label.clone(), Node::Atomic { id: name.clone() }));
                 // I need to check some way if the node itself it's the last on the branch, so we can avoid writing `fork` and `goto` for it.
-                if *is_terminal {
-                    self.post_terminal_deps(name, ctx);
-                } else {
-                    self.post_dependencies(name, ctx);
-                }
+                self.post_terminal_deps(name, ctx);
             }
             ir::Node::Seq(children) => {
                 self.convert_nodes_with_label(children, ctx, label);
@@ -182,23 +178,6 @@ impl IrToFk {
             // We now that the only way to have a `Dep` node is as a dependency of an `Atomic` node, and we are already handling that case by recursively converting the dependencies before the atomic node itself.
             ir::Node::Dep(id) => {}
         }
-    }
-
-    fn post_dependencies(&mut self, parent: &String, ctx: Ctx) {
-        if ctx != Ctx::Main {
-            return;
-        }
-        self.dependencies
-            .iter()
-            .filter(|(_, v)| v.contains(parent))
-            .for_each(|(k, _)| {
-                self.main_path.push(Stmt::new(
-                    None,
-                    Node::Goto {
-                        id: format!("L{k}"),
-                    },
-                ))
-            });
     }
 
     fn post_terminal_deps(&mut self, parent: &String, ctx: Ctx) {
