@@ -1,0 +1,24 @@
+begin
+    s0
+    fork Ls3
+    s1
+    Ls2: join c1
+    s2
+    Ls6: join c2
+    s6
+    fork Ls8
+    fork Ls9
+    s7
+    Ls10: join c3
+    s10
+    goto _end
+    _end: end
+    Ls3: s3
+        fork Ls5
+        s4
+        goto Ls6
+    Ls8: s8
+        goto Ls10
+    Ls9: s9
+        goto Ls10
+end

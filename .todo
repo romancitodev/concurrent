@@ -1,4 +1,8 @@
-- [ ] Fix the bug that doesn't resolve dependencies from the IR to the Fork / Join.
+- [x] Fix the bug that doesn't resolve dependencies from the IR to the Fork / Join.
   - [x] Resolve dependencies
-  - [ ] Distinguish between Fork and Goto in the final section for every `parallel`.
-  - [ ] Find the bug that makes the `Node::Join` appears 2 times when it joins N branches.
+  - [x] Distinguish between Fork and Goto in the final section for every `parallel`.
+  - [x] Find the bug that makes the `Node::Join` appears 2 times when it joins N branches.
+
+- [ ] Fix the bug that shows $s0,[s1,s2#{s1}]$ as `s2` has an explicit dependency on `s1` so it adds a join, but `s1` is already in the list.
+- [ ] Fix the bug that doesn't make Ls5 expands correctly on complex.fk
+- [ ] Fix the dependency resolution for parbegin/parend to IR.

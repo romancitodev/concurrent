@@ -1,0 +1,17 @@
+begin
+    s0
+    fork Ls3
+    s1
+    s2
+    goto _end
+    _end: end
+    Ls3: s3
+        fork Ls5
+        s4
+        s6
+        fork Ls8
+        fork Ls9
+        s7
+        s10
+        goto _end
+end
