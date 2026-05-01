@@ -475,10 +475,10 @@ impl ControlFlowGraph {
                 }
                 fk::Node::Goto { id } => {
                     let mut is_structural_join = false;
-                    if let Some(&target_idx) = self.labels.get(id) {
-                        if Some(target_idx) == stop_join_idx {
-                            is_structural_join = true;
-                        }
+                    if let Some(&target_idx) = self.labels.get(id)
+                        && Some(target_idx) == stop_join_idx
+                    {
+                        is_structural_join = true;
                     }
                     if !is_structural_join && let Some(dep) = ctx.join_labels.get(id) {
                         ctx.dependency_join_labels.insert(id.clone());

@@ -118,7 +118,7 @@ pub fn convert_graph(input: &str, output: &Path, ex: &str) -> Result<(), Error> 
 
     let graph = match format_ext {
         Format::Ir => graph.to_string(),
-        Format::Par => graph.to_par().to_string(),
+        Format::Par => graph.to_par()?.to_string(),
         Format::ForkJoin => graph.to_fk().to_string(),
     };
 

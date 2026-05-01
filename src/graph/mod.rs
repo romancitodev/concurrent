@@ -1,5 +1,9 @@
+use std::collections::{HashMap, HashSet};
 use std::fmt::{self, Write};
 use std::marker::PhantomData;
+
+use crate::{ValidationError, ValidationErrorKind};
+use log::warn;
 
 mod cfg;
 pub mod fk;
@@ -38,9 +42,17 @@ impl<S> Graph<ir::Node, Ir, S> {
         Graph::new(ir_graph.to_fk().0)
     }
 
-    pub fn to_par(self) -> Graph<par::Node, Par, S> {
+    pub fn to_par(self) -> Result<Graph<par::Node, Par, S>, crate::Error> {
+        if has_dependencies(&self.0) {
+            return Err(crate::Error::InvalidGraph(vec![
+                crate::ValidationError::new(
+                    crate::ValidationErrorKind::UnsupportedDependencies,
+                    "Par cannot represent dependencies".to_string(),
+                ),
+            ]));
+        }
         let ir_graph = ir::Graph::new(self.0);
-        Graph::new(ir_graph.to_par().0)
+        Ok(Graph::new(ir_graph.to_par().0))
     }
 }
 
@@ -59,6 +71,9 @@ impl<S> Graph<par::Node, Par, S> {
 impl<S> Graph<fk::Stmt, ForkJoin, S> {
     pub fn parse(input: &str) -> Result<Self, crate::Error> {
         let g = fk::parse(input).map_err(|e| crate::Error::ParseError(format!("ForkJoin: {e}")))?;
+        if let Err(errors) = validate_fk_labels(&g.0) {
+            return Err(crate::Error::InvalidGraph(errors));
+        }
         Ok(Graph::new(g.0))
     }
 
@@ -67,6 +82,102 @@ impl<S> Graph<fk::Stmt, ForkJoin, S> {
         let g = Graph::new(fk_graph.to_ir().0);
         println!("{g:?}");
         g
+    }
+}
+
+fn has_dependencies(nodes: &[ir::Node]) -> bool {
+    nodes.iter().any(has_dependencies_node)
+}
+
+fn has_dependencies_node(node: &ir::Node) -> bool {
+    match node {
+        ir::Node::Atomic(_, deps, _) => !deps.is_empty(),
+        ir::Node::Par(children) | ir::Node::Seq(children) => {
+            children.iter().any(has_dependencies_node)
+        }
+        ir::Node::Dep(_) => true,
+    }
+}
+
+fn validate_fk_labels(stmts: &[fk::Stmt]) -> Result<(), Vec<ValidationError>> {
+    let mut defined: HashMap<String, Vec<(usize, &'static str)>> = HashMap::new();
+    let mut referenced: HashMap<String, Vec<(usize, &'static str)>> = HashMap::new();
+
+    for (idx, stmt) in stmts.iter().enumerate() {
+        if let Some(label) = &stmt.label {
+            defined
+                .entry(label.clone())
+                .or_default()
+                .push((idx, node_kind(&stmt.node)));
+        }
+
+        match &stmt.node {
+            fk::Node::Goto { id } => {
+                referenced
+                    .entry(id.clone())
+                    .or_default()
+                    .push((idx, "goto"));
+            }
+            fk::Node::Fork { id } => {
+                referenced
+                    .entry(id.clone())
+                    .or_default()
+                    .push((idx, "fork"));
+            }
+            _ => {}
+        }
+    }
+
+    let mut errors = Vec::new();
+    for (label, sources) in &referenced {
+        if !defined.contains_key(label) {
+            let refs = sources
+                .iter()
+                .map(|(idx, kind)| format!("{kind}@#{idx}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let message = format!("Label '{label}' referenced by {refs} but not defined",);
+            errors.push(ValidationError::new(
+                ValidationErrorKind::MissingLabel,
+                message.clone(),
+            ));
+            warn!("{message}");
+        }
+    }
+
+    for (label, defs) in &defined {
+        if label == "_end" {
+            continue;
+        }
+        if !referenced.contains_key(label) {
+            let defs = defs
+                .iter()
+                .map(|(idx, kind)| format!("{kind}@#{idx}"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let message = format!("Label '{label}' defined at {defs} but never referenced",);
+            errors.push(ValidationError::new(
+                ValidationErrorKind::UnusedLabel,
+                message.clone(),
+            ));
+            warn!("{message}");
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+fn node_kind(node: &fk::Node) -> &'static str {
+    match node {
+        fk::Node::Final => "final",
+        fk::Node::Join { .. } => "join",
+        fk::Node::Goto { .. } => "goto",
+        fk::Node::Fork { .. } => "fork",
+        fk::Node::Atomic { .. } => "atomic",
     }
 }
 

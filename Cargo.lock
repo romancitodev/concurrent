@@ -213,6 +213,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "layout-rs",
+ "log",
  "pest",
  "pest_derive",
  "petgraph",

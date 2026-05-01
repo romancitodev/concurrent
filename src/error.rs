@@ -10,6 +10,9 @@ pub struct ValidationError {
 pub enum ValidationErrorKind {
     CircularDependency,
     MissingDependency,
+    MissingLabel,
+    UnusedLabel,
+    UnsupportedDependencies,
 }
 
 impl ValidationError {
