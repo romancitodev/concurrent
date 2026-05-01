@@ -20,7 +20,6 @@ enum Region {
 
 impl Region {
     fn sequence(regions: Vec<Region>) -> Self {
-        // Flatten nested sequences and remove empty ones
         let regions: Vec<_> = regions
             .into_iter()
             .flat_map(|r| match r {
@@ -52,6 +51,10 @@ pub struct ControlFlowGraph {
     edges: Vec<(usize, usize)>,
     labels: HashMap<String, usize>,
     label_at: HashMap<usize, String>,
+
+    // For dependencies inference
+    signaled_by: HashMap<String, Vec<String>>, // join_label -> Vec<atomic_name>
+    waits_for: HashMap<usize, String>,         // atomic_idx -> join_label
 }
 
 struct BuildCtx<'a> {
@@ -67,6 +70,8 @@ impl ControlFlowGraph {
             edges: Vec::new(),
             labels: HashMap::new(),
             label_at: HashMap::new(),
+            signaled_by: HashMap::new(),
+            waits_for: HashMap::new(),
         }
     }
 
@@ -82,6 +87,14 @@ impl ControlFlowGraph {
             cfg.nodes.insert(idx, stmt.node.clone());
         }
 
+        cfg.build_edges_and_waits(graph);
+        cfg.find_signalers(graph);
+
+        cfg
+    }
+
+    fn build_edges_and_waits(&mut self, graph: &fk::Graph) {
+        let mut current_join_label = None;
         for (idx, stmt) in graph.0.iter().enumerate() {
             match &stmt.node {
                 fk::Node::Final => {
@@ -109,13 +122,46 @@ impl ControlFlowGraph {
                 }
                 fk::Node::Atomic { .. } | fk::Node::Join { .. } => {
                     if idx + 1 < graph.0.len() {
-                        cfg.edges.push((idx, idx + 1));
+                        self.edges.push((idx, idx + 1));
                     }
                 }
             }
         }
+    }
 
-        cfg
+    fn find_signalers(&mut self, graph: &fk::Graph) {
+        for (idx, stmt) in graph.0.iter().enumerate() {
+            if let fk::Node::Atomic(name) = &stmt.node {
+                if name == "end" || name == "_end" {
+                    continue;
+                }
+
+                let mut look_idx = idx + 1;
+                while let Some(node) = self.nodes.get(&look_idx) {
+                    match node {
+                        fk::Node::Fork(target) | fk::Node::Goto(target) => {
+                            let is_join = if let Some(&t_idx) = self.labels.get(target) {
+                                matches!(self.nodes.get(&t_idx), Some(fk::Node::Join(_)))
+                            } else {
+                                false
+                            };
+
+                            if is_join {
+                                self.signaled_by
+                                    .entry(target.clone())
+                                    .or_default()
+                                    .push(name.clone());
+                            }
+                            if matches!(node, fk::Node::Goto(_)) {
+                                break;
+                            }
+                            look_idx += 1;
+                        }
+                        _ => break,
+                    }
+                }
+            }
+        }
     }
 
     /// Main function to map from Fork/Join to IR.
@@ -132,8 +178,6 @@ impl ControlFlowGraph {
         let region = Self::apply_dependencies(region, &dependencies);
         let ir_node = Self::region_to_ir(&region);
 
-        // If the top-level is a Seq, extract its children directly
-        // to avoid an extra level of nesting
         match ir_node {
             ir::Node::Seq(children) => ir::Graph::new(children),
             other => ir::Graph::new(vec![other]),
@@ -233,13 +277,11 @@ impl ControlFlowGraph {
                     // Find the join point - it's where all forked branches converge
                     let join_idx = self.find_join_for_fork(current, ctx);
 
-                    // Collect all fork targets starting from this fork
-                    let mut fork_targets = vec![current + 1]; // continuation (fall-through)
+                    let mut fork_targets = vec![current + 1];
                     if let Some(&target_idx) = self.labels.get(target_label) {
                         fork_targets.push(target_idx);
                     }
 
-                    // Check for consecutive forks
                     let mut check_idx = current + 1;
                     while let Some(fk::Node::Fork { id: next_target }) = self.nodes.get(&check_idx)
                     {
@@ -253,10 +295,8 @@ impl ControlFlowGraph {
                         }
                         check_idx += 1;
                     }
-                    // Update the continuation to be after all consecutive forks
                     fork_targets[0] = check_idx;
 
-                    // Build each branch up to the join point
                     let mut branches = Vec::new();
                     for &branch_start in &fork_targets {
                         let branch_region =
@@ -270,12 +310,12 @@ impl ControlFlowGraph {
                         regions.push(Region::Parallel { branches });
                     }
 
-                    // Continue from after the join
                     if let Some(join_idx) = join_idx {
                         global_visited.insert(join_idx);
                         current = join_idx + 1;
                     } else {
-                        break;
+                        // Just fallthrough if no join was identified
+                        current = fork_targets[0];
                     }
                 }
                 fk::Node::Join { .. } => {
@@ -285,7 +325,7 @@ impl ControlFlowGraph {
                 }
                 fk::Node::Goto { id: target } => {
                     global_visited.insert(current);
-                    if target == "end" {
+                    if target == "end" || target == "_end" {
                         break;
                     }
                     if ctx.dependency_join_labels.contains(target) {
@@ -319,11 +359,10 @@ impl ControlFlowGraph {
         let mut current = start;
 
         loop {
-            // Stop at join point
-            if let Some(join) = join_idx
-                && current == join
-            {
-                break;
+            if let Some(join) = join_idx {
+                if current == join {
+                    break;
+                }
             }
 
             if global_visited.contains(&current) {
@@ -373,7 +412,6 @@ impl ControlFlowGraph {
                         fork_targets.push(target_idx);
                     }
 
-                    // Check for consecutive forks
                     let mut check_idx = current + 1;
                     while let Some(fk::Node::Fork { id: next_target }) = self.nodes.get(&check_idx)
                     {
@@ -502,10 +540,9 @@ impl ControlFlowGraph {
         let mut visited = HashSet::new();
 
         while let Some(node) = self.nodes.get(&current) {
-            if visited.contains(&current) {
+            if !visited.insert(current) {
                 break;
             }
-            visited.insert(current);
 
             match node {
                 fk::Node::Join { .. } => {

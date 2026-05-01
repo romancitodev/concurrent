@@ -82,15 +82,6 @@ pub fn process_graph_to_ir(input: &str, output_path: &Path, ext: &str) -> Result
     Ok(())
 }
 
-fn format_from_ext(ext: &str) -> Result<Format, Error> {
-    match ext {
-        "graph" => Ok(Format::Ir),
-        "par" => Ok(Format::Par),
-        "fk" => Ok(Format::ForkJoin),
-        _ => Err(Error::InvalidType(ext.to_string())),
-    }
-}
-
 impl TryFrom<&str> for Format {
     type Error = Error;
 

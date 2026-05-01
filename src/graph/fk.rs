@@ -168,6 +168,27 @@ impl IrToFk {
                 // I need to check some way if the node itself it's the last on the branch, so we can avoid writing `fork` and `goto` for it.
                 self.post_terminal_deps(name, ctx);
             }
+        }
+        for dep in deps {
+            if !matches!(dep, ir::Node::Dep(_)) {
+                self.collect_dependencies(&[dep.clone()]);
+            }
+        }
+    }
+
+    fn convert_nodes(&mut self, nodes: &[ir::Node], has_next_parent: bool) {
+        let len = nodes.len();
+        for (i, node) in nodes.iter().enumerate() {
+            let has_next = if i + 1 < len { true } else { has_next_parent };
+            self.convert_node(node, has_next);
+        }
+    }
+
+    fn convert_node(&mut self, node: &ir::Node, has_next: bool) {
+        match node {
+            ir::Node::Atomic(name, deps, _) => {
+                self.convert_atomic(name, deps, has_next);
+            }
             ir::Node::Seq(children) => {
                 self.convert_nodes_with_label(children, ctx, label);
             }
@@ -362,7 +383,6 @@ impl IrToFk {
             }
             _ => unreachable!(),
         }
-    }
 
     fn emit_branch_dependencies(&mut self, node_id: &str, target: &str, is_terminal: bool) -> bool {
         let mut dependencies = self
