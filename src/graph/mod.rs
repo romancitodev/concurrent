@@ -43,15 +43,8 @@ impl<S> Graph<ir::Node, Ir, S> {
     }
 
     pub fn to_par(self) -> Result<Graph<par::Node, Par, S>, crate::Error> {
-        if has_dependencies(&self.0) {
-            return Err(crate::Error::InvalidGraph(vec![
-                crate::ValidationError::new(
-                    crate::ValidationErrorKind::UnsupportedDependencies,
-                    "Par cannot represent dependencies".to_string(),
-                ),
-            ]));
-        }
-        let ir_graph = ir::Graph::new(self.0);
+        let cleaned = strip_redundant_dependencies(&self.0)?;
+        let ir_graph = ir::Graph::new(cleaned);
         Ok(Graph::new(ir_graph.to_par().0))
     }
 }
@@ -85,17 +78,108 @@ impl<S> Graph<fk::Stmt, ForkJoin, S> {
     }
 }
 
-fn has_dependencies(nodes: &[ir::Node]) -> bool {
-    nodes.iter().any(has_dependencies_node)
+fn strip_redundant_dependencies(nodes: &[ir::Node]) -> Result<Vec<ir::Node>, crate::Error> {
+    let mut predecessors: HashMap<String, HashSet<String>> = HashMap::new();
+    collect_predecessors(nodes, &HashSet::new(), &mut predecessors);
+
+    let mut errors = Vec::new();
+    let cleaned = nodes
+        .iter()
+        .map(|node| strip_deps_node(node, &predecessors, &mut errors))
+        .collect::<Vec<_>>();
+
+    if errors.is_empty() {
+        Ok(cleaned)
+    } else {
+        Err(crate::Error::InvalidGraph(errors))
+    }
 }
 
-fn has_dependencies_node(node: &ir::Node) -> bool {
+fn collect_predecessors(
+    nodes: &[ir::Node],
+    incoming: &HashSet<String>,
+    predecessors: &mut HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
+    let mut prefix = incoming.clone();
+    let mut all_atoms = HashSet::new();
+
+    for node in nodes {
+        let node_atoms = collect_predecessors_node(node, &prefix, predecessors);
+        prefix.extend(node_atoms.iter().cloned());
+        all_atoms.extend(node_atoms);
+    }
+
+    all_atoms
+}
+
+fn collect_predecessors_node(
+    node: &ir::Node,
+    incoming: &HashSet<String>,
+    predecessors: &mut HashMap<String, HashSet<String>>,
+) -> HashSet<String> {
     match node {
-        ir::Node::Atomic(_, deps, _) => !deps.is_empty(),
-        ir::Node::Par(children) | ir::Node::Seq(children) => {
-            children.iter().any(has_dependencies_node)
+        ir::Node::Atomic(id, _, _) => {
+            predecessors
+                .entry(id.clone())
+                .or_default()
+                .extend(incoming.iter().cloned());
+            let mut set = HashSet::new();
+            set.insert(id.clone());
+            set
         }
-        ir::Node::Dep(_) => true,
+        ir::Node::Seq(children) => collect_predecessors(children, incoming, predecessors),
+        ir::Node::Par(children) => {
+            let mut all_atoms = HashSet::new();
+            for child in children {
+                let child_atoms = collect_predecessors_node(child, incoming, predecessors);
+                all_atoms.extend(child_atoms);
+            }
+            all_atoms
+        }
+        ir::Node::Dep(_) => HashSet::new(),
+    }
+}
+
+fn strip_deps_node(
+    node: &ir::Node,
+    predecessors: &HashMap<String, HashSet<String>>,
+    errors: &mut Vec<ValidationError>,
+) -> ir::Node {
+    match node {
+        ir::Node::Atomic(id, deps, terminal) => {
+            let guaranteed = predecessors.get(id).cloned().unwrap_or_default();
+            let mut kept = Vec::new();
+
+            for dep in deps {
+                if let ir::Node::Dep(dep_id) = dep {
+                    if guaranteed.contains(dep_id) {
+                        continue;
+                    }
+                    errors.push(ValidationError::new(
+                        ValidationErrorKind::UnsupportedDependencies,
+                        format!(
+                            "Dependency '{id}' depends on '{dep_id}' but is not structurally guaranteed",
+                        ),
+                    ));
+                }
+                kept.push(dep.clone());
+            }
+
+            ir::Node::Atomic(id.clone(), kept, *terminal)
+        }
+        ir::Node::Seq(children) => ir::Node::Seq(
+            children
+                .iter()
+                .map(|c| strip_deps_node(c, predecessors, errors))
+                .collect(),
+        ),
+        ir::Node::Par(children) => ir::Node::Par(
+            children
+                .iter()
+                .map(|c| strip_deps_node(c, predecessors, errors))
+                .collect(),
+        ),
+        ir::Node::Dep(id) => ir::Node::Dep(id.clone()),
     }
 }
 
