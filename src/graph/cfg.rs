@@ -403,6 +403,12 @@ impl ControlFlowGraph {
                     }
 
                     if let Some(nested_join) = nested_join_idx {
+                        if Some(nested_join) == join_idx {
+                            // without this guard the nested fork "steals" the
+                            // outer join and the branch keeps consuming nodes past its boundary.
+                            // This stops at the correct join and fixes the over-expanded Seq.
+                            break;
+                        }
                         global_visited.insert(nested_join);
                         current = nested_join + 1;
                     } else {

@@ -63,19 +63,20 @@ impl IrToFk {
     }
 
     fn finalize(mut self) -> Graph {
-      self.main_path.push(Stmt::new(
-          None,
-          Node::Goto {
-              id: "_end".to_string(),
-          },
-      ));
-      self.main_path.push(Stmt::new(Some("_end".to_string()), Node::Final));
+        self.main_path.push(Stmt::new(
+            None,
+            Node::Goto {
+                id: "_end".to_string(),
+            },
+        ));
+        self.main_path
+            .push(Stmt::new(Some("_end".to_string()), Node::Final));
 
-      while let Some(branch) = self.branches.pop() {
-          self.expand_branch(branch.stmts, branch.target);
-      }
+        while let Some(branch) = self.branches.pop() {
+            self.expand_branch(branch.stmts, branch.target);
+        }
 
-      Graph::new(self.main_path)
+        Graph::new(self.main_path)
     }
 
     fn build(&mut self, nodes: &[ir::Node]) {
@@ -211,14 +212,19 @@ impl IrToFk {
     /// counter: c{counter}
     /// deps: Vec<Node>
     fn resolve_dependencies(&mut self, parent: &String) {
-        let Some(deps) = self.dependencies.get_mut(parent) else { return };
+        let Some(deps) = self.dependencies.get_mut(parent) else {
+            return;
+        };
 
         if deps.is_empty() {
             return;
         }
 
-        if let Some(transivity_idx) = deps.iter().position(|d| self.main_path.last().is_some_and(|s| s.node.id() == *d)) {
-          deps.remove(transivity_idx);
+        if let Some(transivity_idx) = deps
+            .iter()
+            .position(|d| self.main_path.last().is_some_and(|s| s.node.id() == *d))
+        {
+            deps.remove(transivity_idx);
         }
 
         if deps.is_empty() {
@@ -290,7 +296,7 @@ impl IrToFk {
         }
 
         for branch in &branches[1..] {
-          let label = format!("L{}", branch.id());
+            let label = format!("L{}", branch.id());
             self.branches.push(Branch {
                 label,                 // L{unknown}
                 stmts: branch.clone(), // the entire node.
@@ -300,21 +306,21 @@ impl IrToFk {
     }
 
     fn convert_branch_node(
-      &mut self,
-      node: &ir::Node,
-      label: Option<String>,
-      next_node: Option<&ir::Node>,
-      target: &str
+        &mut self,
+        node: &ir::Node,
+        label: Option<String>,
+        next_node: Option<&ir::Node>,
+        target: &str,
     ) {
-      match node {
-        ir::Node::Par(branches) => {
-          let par = next_node.map_or(target.to_string(), |n| format!("L{}", n.id()));
-          let has_deps = next_node.map_or(false, |n| self.node_has_dependencies(n));
-          let join_label = (next_node.is_some() && !has_deps).then(|| par.clone());
-          self.convert_parallel(branches, label, par, join_label);
+        match node {
+            ir::Node::Par(branches) => {
+                let par = next_node.map_or(target.to_string(), |n| format!("L{}", n.id()));
+                let has_deps = next_node.map_or(false, |n| self.node_has_dependencies(n));
+                let join_label = (next_node.is_some() && !has_deps).then(|| par.clone());
+                self.convert_parallel(branches, label, par, join_label);
+            }
+            _ => self.convert_node(node, label, Ctx::Deferred),
         }
-        _ => self.convert_node(node, label, Ctx::Deferred),
-      }
     }
 
     fn expand_branch(&mut self, branch: ir::Node, target: String) {
@@ -358,7 +364,6 @@ impl IrToFk {
             _ => unreachable!(),
         }
     }
-
 
     fn emit_branch_dependencies(&mut self, node_id: &str, target: &str, is_terminal: bool) -> bool {
         let mut dependencies = self
@@ -437,8 +442,10 @@ pub enum Node {
 impl Node {
     pub fn id_as_str(&self) -> &str {
         match self {
-          Node::Final => "_final",
-          Node::Join { id } | Node::Goto { id } | Node::Fork { id } | Node::Atomic { id } => id.as_str(),
+            Node::Final => "_final",
+            Node::Join { id } | Node::Goto { id } | Node::Fork { id } | Node::Atomic { id } => {
+                id.as_str()
+            }
         }
     }
     pub fn id(&self) -> String {
