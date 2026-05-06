@@ -4,7 +4,7 @@
   - [x] Find the bug that makes the `Node::Join` appears 2 times when it joins N branches.
 
 - [x] Fix the bug that shows $s0,[s1,s2#{s1}]$ as `s2` has an explicit dependency on `s1` so it adds a join, but `s1` is already in the list.
-- [ ] Fix the bug that doesn't make Ls5 expands correctly on complex.fk
+- [x] Fix the bug that doesn't make Ls5 expands correctly on complex.fk
 - [ ] Fix the dependency resolution for parbegin/parend to IR.
 
 - [ ] Refactor everything to use `&str` instead of `String`, because actually there are a lot of clones that can be avoided if we just use `&str` and make sure the lifetimes are correct. This will also make the code more efficient and cleaner.
