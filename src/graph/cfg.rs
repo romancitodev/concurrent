@@ -102,11 +102,7 @@ impl ControlFlowGraph {
                         cfg.edges.push((idx, idx + 1));
                     }
                 }
-                fk::Node::Atomic { id } if id == "end" => {
-                    if id == "end" {
-                        continue;
-                    }
-                }
+                fk::Node::Atomic { id } if id == "end" => {}
                 fk::Node::Atomic { .. } | fk::Node::Join { .. } => {
                     if idx + 1 < graph.0.len() {
                         cfg.edges.push((idx, idx + 1));
@@ -145,19 +141,19 @@ impl ControlFlowGraph {
         let mut idx = 0;
 
         while self.nodes.contains_key(&idx) {
-            if let Some(fk::Node::Join { .. }) = self.nodes.get(&idx) {
-                if let Some(label) = self.label_at.get(&idx) {
-                    let mut next = idx + 1;
-                    while let Some(node) = self.nodes.get(&next) {
-                        if let fk::Node::Atomic { id } = node {
-                            join_labels.insert(label.clone(), id.clone());
-                            break;
-                        }
-                        if matches!(node, fk::Node::Final) {
-                            break;
-                        }
-                        next += 1;
+            if let Some(fk::Node::Join { .. }) = self.nodes.get(&idx)
+                && let Some(label) = self.label_at.get(&idx)
+            {
+                let mut next = idx + 1;
+                while let Some(node) = self.nodes.get(&next) {
+                    if let fk::Node::Atomic { id } = node {
+                        join_labels.insert(label.clone(), id.clone());
+                        break;
                     }
+                    if matches!(node, fk::Node::Final) {
+                        break;
+                    }
+                    next += 1;
                 }
             }
             idx += 1;
@@ -172,10 +168,10 @@ impl ControlFlowGraph {
     ) -> HashSet<String> {
         let mut labels = HashSet::new();
         for node in self.nodes.values() {
-            if let fk::Node::Fork { id } = node {
-                if join_labels.contains_key(id) {
-                    labels.insert(id.clone());
-                }
+            if let fk::Node::Fork { id } = node
+                && join_labels.contains_key(id)
+            {
+                labels.insert(id.clone());
             }
         }
         labels
@@ -471,7 +467,7 @@ impl ControlFlowGraph {
                     break;
                 }
                 fk::Node::Goto { id } => {
-                    let is_structural_join = self.labels.get(id).map(|i| *i) == stop_join_idx;
+                    let is_structural_join = self.labels.get(id).copied() == stop_join_idx;
 
                     if !is_structural_join && let Some(dep) = ctx.join_labels.get(id) {
                         ctx.dependency_join_labels.insert(id.clone());

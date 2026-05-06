@@ -17,7 +17,7 @@ begin
         s8
         s9
       parend
+      s10
     end
   parend
-  s10
 end

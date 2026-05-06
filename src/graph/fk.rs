@@ -37,7 +37,7 @@ struct Branch {
 
 type Id = String;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Ctx {
     Main,     // main path
     Deferred, // on branch path
@@ -62,26 +62,20 @@ impl IrToFk {
         }
     }
 
-    fn new_label(&mut self) -> String {
-        let label = format!("L{}", self.label_counter);
-        self.label_counter += 1;
-        label
-    }
-
     fn finalize(mut self) -> Graph {
-        let branches = std::mem::take(&mut self.branches);
-        self.main_path.push(Stmt::new(
-            None,
-            Node::Goto {
-                id: "_end".to_string(),
-            },
-        ));
-        self.main_path
-            .push(Stmt::new(Some("_end".to_string()), Node::Final));
-        for branch in branches {
-            self.expand_branch(branch.stmts, branch.target);
-        }
-        Graph::new(self.main_path)
+      self.main_path.push(Stmt::new(
+          None,
+          Node::Goto {
+              id: "_end".to_string(),
+          },
+      ));
+      self.main_path.push(Stmt::new(Some("_end".to_string()), Node::Final));
+
+      while let Some(branch) = self.branches.pop() {
+          self.expand_branch(branch.stmts, branch.target);
+      }
+
+      Graph::new(self.main_path)
     }
 
     fn build(&mut self, nodes: &[ir::Node]) {
@@ -133,20 +127,17 @@ impl IrToFk {
             match &nodes[idx] {
                 ir::Node::Par(branches) => {
                     let next_node = nodes.get(idx + 1);
-                    let target = next_node
-                        .map(|n| format!("L{}", n.id()))
-                        .unwrap_or_else(|| "_end".to_string());
-                    let next_has_deps = next_node.map_or(false, |n| self.node_has_dependencies(n));
-                    let join_label = if next_node.is_some() && !next_has_deps {
-                        Some(target.clone())
-                    } else {
-                        None
-                    };
+                    let target =
+                        next_node.map_or_else(|| "_end".to_string(), |n| format!("L{}", n.id()));
+                    let next_has_deps =
+                        next_node.map_or_else(|| false, |n| self.node_has_dependencies(n));
+                    let join_label =
+                        (next_node.is_some() && !next_has_deps).then(|| target.clone());
 
                     self.convert_parallel(branches, label, target, join_label);
                 }
                 _ => {
-                    self.convert_node(&nodes[idx], label, ctx.clone());
+                    self.convert_node(&nodes[idx], label, ctx);
                 }
             }
             idx += 1;
@@ -220,18 +211,29 @@ impl IrToFk {
     /// counter: c{counter}
     /// deps: Vec<Node>
     fn resolve_dependencies(&mut self, parent: &String) {
-        let id = format!("L{parent}");
-        if let Some(deps) = self.dependencies.get(parent)
-            && !deps.is_empty()
-        {
-            let counter = format!("c{}", self.update_counter());
-            self.main_path.push(Stmt::new(
-                Some(id.clone()),
-                Node::Join {
-                    id: counter.clone(),
-                },
-            ));
+        let Some(deps) = self.dependencies.get_mut(parent) else { return };
+
+        if deps.is_empty() {
+            return;
         }
+
+        if let Some(transivity_idx) = deps.iter().position(|d| self.main_path.last().is_some_and(|s| s.node.id() == *d)) {
+          deps.remove(transivity_idx);
+        }
+
+        if deps.is_empty() {
+            return;
+        }
+
+        let id = format!("L{parent}");
+
+        let counter = format!("c{}", self.update_counter());
+        self.main_path.push(Stmt::new(
+            Some(id.clone()),
+            Node::Join {
+                id: counter.clone(),
+            },
+        ));
     }
 
     /// branches is the list of branches that we need to convert in parallel.
@@ -288,13 +290,31 @@ impl IrToFk {
         }
 
         for branch in &branches[1..] {
-            let label = self.new_label();
+          let label = format!("L{}", branch.id());
             self.branches.push(Branch {
                 label,                 // L{unknown}
                 stmts: branch.clone(), // the entire node.
                 target: target.clone(),
             });
         }
+    }
+
+    fn convert_branch_node(
+      &mut self,
+      node: &ir::Node,
+      label: Option<String>,
+      next_node: Option<&ir::Node>,
+      target: &str
+    ) {
+      match node {
+        ir::Node::Par(branches) => {
+          let par = next_node.map_or(target.to_string(), |n| format!("L{}", n.id()));
+          let has_deps = next_node.map_or(false, |n| self.node_has_dependencies(n));
+          let join_label = (next_node.is_some() && !has_deps).then(|| par.clone());
+          self.convert_parallel(branches, label, par, join_label);
+        }
+        _ => self.convert_node(node, label, Ctx::Deferred),
+      }
     }
 
     fn expand_branch(&mut self, branch: ir::Node, target: String) {
@@ -311,40 +331,14 @@ impl IrToFk {
                 }
             }
             ir::Node::Par(branch) | ir::Node::Seq(branch) => {
-                let first_node = branch
-                    .first()
-                    .expect("Branch should have at least one node");
-                let label = first_node.id();
-                let labeled = format!("L{label}");
-                self.convert_node(first_node, Some(labeled), Ctx::Deferred);
-                let mut continue_to_target = self.emit_branch_dependencies(
-                    &label,
-                    &target,
-                    Self::is_terminal_node(first_node),
-                );
-                if !continue_to_target {
-                    return;
-                }
-                for node in &branch[1..] {
-                    // In case we find a dependency of the current node, we resolve it instead of doing a fork, because the dependency will be already resolved in the main path.
-                    // example:
-                    // $a,{[b,c#{d}],[d,e]},f$ then:
-                    // begin
-                    //  a
-                    //  fork LD
-                    //  b
-                    //  LC: c <---- now c have a label.
-                    //  LF: join c1
-                    //  f
-                    //  goto end
-                    //  LD: d
-                    //      fork LC <---- now d have a dependency on c, so instead of doing a goto, we do a fork to the label of c.
-                    //      e
-                    //      goto LF
-                    //
-                    // end
-                    // node.
-                    self.convert_node(node, None, Ctx::Deferred);
+                let mut continue_to_target = true;
+
+                for (idx, node) in branch.iter().enumerate() {
+                    let label = (idx == 0).then_some(format!("L{}", node.id()));
+                    let next_node = branch.get(idx + 1);
+
+                    self.convert_branch_node(node, label, next_node, &target);
+
                     let node_id = node.id();
                     continue_to_target = self.emit_branch_dependencies(
                         &node_id,
@@ -355,6 +349,7 @@ impl IrToFk {
                         return;
                     }
                 }
+
                 if continue_to_target {
                     self.main_path
                         .push(Stmt::new(None, Node::Goto { id: target }));
@@ -363,6 +358,7 @@ impl IrToFk {
             _ => unreachable!(),
         }
     }
+
 
     fn emit_branch_dependencies(&mut self, node_id: &str, target: &str, is_terminal: bool) -> bool {
         let mut dependencies = self
@@ -409,8 +405,7 @@ impl IrToFk {
     fn node_has_dependencies(&self, node: &ir::Node) -> bool {
         self.dependencies
             .get(&node.id())
-            .map(|deps| !deps.is_empty())
-            .unwrap_or(false)
+            .is_some_and(|deps| !deps.is_empty())
     }
 
     fn is_terminal_node(node: &ir::Node) -> bool {
@@ -437,6 +432,23 @@ pub enum Node {
     Goto { id: String },
     Fork { id: String },
     Atomic { id: String },
+}
+
+impl Node {
+    pub fn id_as_str(&self) -> &str {
+        match self {
+          Node::Final => "_final",
+          Node::Join { id } | Node::Goto { id } | Node::Fork { id } | Node::Atomic { id } => id.as_str(),
+        }
+    }
+    pub fn id(&self) -> String {
+        match self {
+            Node::Final => "_final".to_string(),
+            Node::Join { id } | Node::Goto { id } | Node::Fork { id } | Node::Atomic { id } => {
+                id.clone()
+            }
+        }
+    }
 }
 
 #[derive(Parser)]

@@ -34,13 +34,13 @@ impl Node {
     pub fn id(&self) -> String {
         match self {
             Node::Atomic(id, _, _) | Node::Dep(id) => id.clone(),
-            Node::Par(b) | Node::Seq(b) => b.first().map(Node::id).unwrap(),
+            Node::Par(b) | Node::Seq(b) => b.first().map(Node::id).expect("Empty block"),
         }
     }
 
     pub fn last_node(&self) -> Option<&Node> {
         match self {
-            Node::Par(b) | Node::Seq(b) => b.last().map(|n| n.last_node()).flatten(),
+            Node::Par(b) | Node::Seq(b) => b.last().and_then(|n| n.last_node()),
             Node::Atomic(_, _, _) => Some(self),
             _ => None, // We don't want to catch the last dep node.
         }
