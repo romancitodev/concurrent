@@ -9,3 +9,4 @@ test_*.graph
 # OS specific
 .DS_Store
 Thumbs.db
+pkg

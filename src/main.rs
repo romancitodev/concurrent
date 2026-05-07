@@ -7,7 +7,8 @@ use concurrent::{Error, convert_graph, process_graph_to_ir, process_graph_to_pdf
 
 type AppResult<T> = Result<T, Error>;
 
-const DEFAULT_OUTPUT: &str = "render/output.pdf";
+const DEFAULT_PDF_OUTPUT: &str = "render/output.pdf";
+const DEFAULT_IR_OUTPUT: &str = "render/output.graph";
 
 fn main() -> AppResult<()> {
     let cmd = cli();
@@ -46,7 +47,7 @@ fn render_pdf(args: &clap::ArgMatches) -> AppResult<()> {
     let output_path = args
         .get_one::<PathBuf>("output")
         .cloned()
-        .unwrap_or(PathBuf::from(DEFAULT_OUTPUT));
+        .unwrap_or(PathBuf::from(DEFAULT_PDF_OUTPUT));
 
     process_graph_to_pdf(&input, &output_path, ext)
 }
@@ -72,7 +73,7 @@ fn render_ir(args: &clap::ArgMatches) -> AppResult<()> {
     let output_path = args
         .get_one::<PathBuf>("output")
         .cloned()
-        .unwrap_or(PathBuf::from(DEFAULT_OUTPUT));
+        .unwrap_or(PathBuf::from(DEFAULT_IR_OUTPUT));
 
     process_graph_to_ir(&input, &output_path, ext)
 }
@@ -95,11 +96,11 @@ fn convert(args: &clap::ArgMatches) -> AppResult<()> {
         return Err(Error::InvalidParams);
     };
 
-    let output_ext = args
+    let output_path = args
         .get_one::<PathBuf>("output")
-        .expect("Output extension is required");
+        .ok_or(Error::InvalidParams)?;
 
-    convert_graph(&input, output_ext, ext)?;
+    convert_graph(&input, output_path, ext)?;
 
     Ok(())
 }

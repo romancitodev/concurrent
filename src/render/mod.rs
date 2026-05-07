@@ -1,5 +1,8 @@
 use std::fmt::Write;
+
+#[cfg(feature = "cli")]
 use std::io;
+#[cfg(feature = "cli")]
 use std::path::Path;
 
 use layout::backends::svg::SVGWriter;
@@ -39,6 +42,7 @@ fn generate_svg(graph: &mut VisualGraph) -> String {
     svg.finalize()
 }
 
+#[cfg(feature = "cli")]
 pub fn render_svg_to_pdf(svg: impl AsRef<str>, output: &Path) -> io::Result<()> {
     use svg2pdf::{ConversionOptions, PageOptions};
 

@@ -10,23 +10,39 @@ struct Case {
 
 const CASES: &[Case] = &[
     Case {
-        name: "sequence",
+        name: "01_sequence",
         par_supported: true,
     },
     Case {
-        name: "parallel",
+        name: "02_sequence_basic",
         par_supported: true,
     },
     Case {
-        name: "nested_seq",
+        name: "03_parallel",
         par_supported: true,
     },
     Case {
-        name: "dependencies",
+        name: "04_parallel_v2",
         par_supported: false,
     },
     Case {
-        name: "terminal",
+        name: "05_parallel_v3",
+        par_supported: true,
+    },
+    Case {
+        name: "06_nested_seq",
+        par_supported: true,
+    },
+    Case {
+        name: "07_dependencies",
+        par_supported: false,
+    },
+    Case {
+        name: "08_terminal",
+        par_supported: false,
+    },
+    Case {
+        name: "09_complex",
         par_supported: false,
     },
 ];
@@ -50,7 +66,7 @@ fn normalize_ir(input: &str) -> String {
 }
 
 fn load_case_ir(case: Case) -> String {
-    read_fixture(&format!("ir/{}.graph", case.name))
+    read_fixture(&format!("ir/valid/{}.graph", case.name))
 }
 
 #[test]
