@@ -23,6 +23,24 @@ pub struct ValidatedGraph {
     petgraph: petgraph::Graph<String, &'static str>,
 }
 
+#[cfg_attr(feature = "web", derive(serde::Serialize))]
+pub struct GraphNodeData<'a> {
+    pub id: &'a str,
+}
+
+#[cfg_attr(feature = "web", derive(serde::Serialize))]
+pub struct GraphEdgeData<'a> {
+    pub from: &'a str,
+    pub to: &'a str,
+    pub kind: &'static str,
+}
+
+#[cfg_attr(feature = "web", derive(serde::Serialize))]
+pub struct GraphData<'a> {
+    pub nodes: Vec<GraphNodeData<'a>>,
+    pub edges: Vec<GraphEdgeData<'a>>,
+}
+
 impl ValidatedGraph {
     #[must_use]
     pub fn render_to_svg(&self) -> String {
@@ -37,6 +55,34 @@ impl ValidatedGraph {
     #[must_use]
     pub fn into_petgraph(self) -> petgraph::Graph<String, &'static str> {
         self.petgraph
+    }
+
+    #[must_use]
+    pub fn data(&self) -> GraphData<'_> {
+        use petgraph::visit::EdgeRef;
+
+        let nodes = self
+            .petgraph
+            .node_weights()
+            .map(|id| GraphNodeData { id: id.as_str() })
+            .collect();
+
+        let edges = self
+            .petgraph
+            .edge_references()
+            .map(|edge| {
+                let from = self.petgraph[edge.source()].as_str();
+                let to = self.petgraph[edge.target()].as_str();
+                let kind = if edge.weight().is_empty() {
+                    "flow"
+                } else {
+                    *edge.weight()
+                };
+                GraphEdgeData { from, to, kind }
+            })
+            .collect();
+
+        GraphData { nodes, edges }
     }
 }
 
@@ -155,6 +201,15 @@ pub fn convert_graph_string_wasm(
 pub fn render_graph_to_svg_wasm(input: &str, input_format: &str) -> Result<String, JsValue> {
     let format = format_from_web(input_format).map_err(map_wasm_error)?;
     render_graph_to_svg(input, format).map_err(map_wasm_error)
+}
+
+#[cfg(feature = "web")]
+#[wasm_bindgen]
+pub fn graph_data_wasm(input: &str, input_format: &str) -> Result<JsValue, JsValue> {
+    let format = format_from_web(input_format).map_err(map_wasm_error)?;
+    let graph = parse_and_validate(input, format).map_err(map_wasm_error)?;
+    serde_wasm_bindgen::to_value(&graph.data())
+        .map_err(|e| JsValue::from_str(&e.to_string()))
 }
 
 impl TryFrom<&str> for Format {

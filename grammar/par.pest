@@ -4,10 +4,18 @@ Statement = _{
     NEWLINE* ~ Block ~ NEWLINE*
 }
 
+ParStatement = _{
+    NEWLINE* ~ ParChild ~ NEWLINE*
+}
+
 Inline = _{ !KW ~ Id }
 
 Block = _{
     (ParBlock | SeqBlock | Inline)
+}
+
+ParChild = _{
+    (SeqBlock | Inline)
 }
 
 SeqBlock = {
@@ -15,7 +23,7 @@ SeqBlock = {
 }
 
 ParBlock = {
-    "parbegin" ~ Statement+ ~ "parend"
+    "parbegin" ~ ParStatement+ ~ "parend"
 }
 
 Id = @{ ASCII_ALPHA ~ (ASCII_ALPHANUMERIC | "_")* }
